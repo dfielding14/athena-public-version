@@ -30,15 +30,21 @@ public:
   ~TurbulenceDriver();
   void Driving(void);
   void Generate(void);
+  void Generate1D(void);
   void PowerSpectrum(AthenaFFTComplex *amp);
   void Perturb(Real dt);
+  void PerturbDensity(Real dt);
   int64_t GetKcomp(int idx, int disp, int Nx);
+  Real dedt;
 private:
   int64_t rseed;
   int nlow,nhigh;
   Real dtdrive,tdrive;
-  Real expo,dedt,dvol;
+  Real tcorr,z_turb;
+  Real expo,dvol;
+  Real dpert;
   AthenaArray<Real> *vel;
+  AthenaArray<Real> *drho;
 };
 
 #endif // FFT_TURBULENCE_HPP_
