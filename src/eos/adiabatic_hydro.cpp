@@ -27,7 +27,6 @@ EquationOfState::EquationOfState(MeshBlock *pmb, ParameterInput *pin) {
   density_floor_  = pin->GetOrAddReal("hydro","dfloor", std::sqrt(1024*(FLT_MIN)));
   pressure_floor_ = pin->GetOrAddReal("hydro","pfloor", std::sqrt(1024*(FLT_MIN)));
   velocity_ceiling_ = pin->GetOrAddReal("hydro","vceil",0.0);
-
   neighbor_flooring_ = pin->GetOrAddBoolean("problem","neighbor_flooring_", false); // average the neighboring cells to get floor value rather than reset to the floor value
 }
 
