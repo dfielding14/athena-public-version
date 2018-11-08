@@ -27,7 +27,7 @@ class FFTDriver;
 class TurbulenceDriver : public FFTDriver{
 public:
   TurbulenceDriver(Mesh *pm, ParameterInput *pin);
-  ~TurbulenceDriver(Mesh *pm);
+  ~TurbulenceDriver();
   void Driving(void);
   void Generate(void);
   void Generate1D(void);

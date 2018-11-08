@@ -83,11 +83,12 @@ TurbulenceDriver::TurbulenceDriver(Mesh *pm, ParameterInput *pin)
 }
 
 // destructor
-TurbulenceDriver::~TurbulenceDriver(Mesh *pm) {
-  if (pm->turb_flag != 4) {
+TurbulenceDriver::~TurbulenceDriver() {
+  if (vel != NULL) {
     for (int nv=0; nv<3; nv++) vel[nv].DeleteAthenaArray();
     delete [] vel;
-  } else {
+  } 
+  if (drho != NULL) {
     drho[0].DeleteAthenaArray();
     delete [] drho;
   }
