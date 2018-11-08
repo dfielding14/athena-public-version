@@ -27,13 +27,13 @@ class FFTDriver;
 class TurbulenceDriver : public FFTDriver{
 public:
   TurbulenceDriver(Mesh *pm, ParameterInput *pin);
-  ~TurbulenceDriver();
+  ~TurbulenceDriver(Mesh *pm);
   void Driving(void);
   void Generate(void);
   void Generate1D(void);
   void PowerSpectrum(AthenaFFTComplex *amp);
   void Perturb(Real dt);
-  void PerturbDensity(Real dt);
+  void PerturbDensity();
   int64_t GetKcomp(int idx, int disp, int Nx);
   Real dedt;
 private:

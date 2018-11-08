@@ -83,7 +83,7 @@ TurbulenceDriver::TurbulenceDriver(Mesh *pm, ParameterInput *pin)
 }
 
 // destructor
-TurbulenceDriver::~TurbulenceDriver() {
+TurbulenceDriver::~TurbulenceDriver(Mesh *pm) {
   if (pm->turb_flag != 4) {
     for (int nv=0; nv<3; nv++) vel[nv].DeleteAthenaArray();
     delete [] vel;
@@ -91,7 +91,6 @@ TurbulenceDriver::~TurbulenceDriver() {
     drho[0].DeleteAthenaArray();
     delete [] drho;
   }
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -123,7 +122,7 @@ void TurbulenceDriver::Driving(void) {
       break;
     case 4: // turb_flag == 4 : density perturbation
       PerturbDensity();
-      break
+      break;
     default:
       std::stringstream msg;
       msg << "### FATAL ERROR in TurbulenceDriver::Driving" << std::endl
@@ -173,7 +172,7 @@ void TurbulenceDriver::Generate(void) {
     int ks=pm->pblock->ks, ke=pm->pblock->ke;
     
     for (int nv=0; nv<3; nv++) {
-      AthenaArray<Real> &dv = vel[nv], dv_mb;
+      AthenaArray<Real> &dv = vel[nv], dv_mb, dv_mb_previous;
       AthenaFFTComplex *fv = pfb->in_;
 
       PowerSpectrum(fv);
