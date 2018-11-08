@@ -176,8 +176,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real Om      = 0.27;
   Real redshift= 0.0;
   Real rhom    = (3. * SQR(H0) * Om * pow(1.+redshift,3))/(2.*FourPiG);
+  Real rhoc    = (3. * SQR(H0))/(2.*FourPiG);
   Real deltac  = (200./3.) * pow(cnfw,3) * 1.0/(std::log(1.0+cnfw) - cnfw/(1.0+cnfw));
-  Real rhos    = deltac*rhom;
+  Real rhos    = deltac*rhoc;
   Real rs      = rvir/cnfw;
   grav_scale_inner = FourPiG*rhos*rs*SQR(time_scale);
   grav_scale_outer = FourPiG*rhom*rs*SQR(time_scale);
