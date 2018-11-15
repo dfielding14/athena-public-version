@@ -46,18 +46,10 @@ static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
 static Real pgas_table_min, pgas_table_max, pgas_table_n;
 static Real t_cool_start;
-static bool heat_redistribute, constant_energy;
-static bool adaptive_driving, tophat_driving;
-static Real drive_duration, drive_separation, dedt_on;
 
 static Real cooling_timestep(MeshBlock *pmb);
-static int turb_grid_size;
-static Real kappa;
-static bool conduction_on;
 static Real dt_cutoff, cfl_cool;
 
-static Real grav_accel;
-static bool gravity_on;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -90,8 +82,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real vel_scale = std::sqrt(pgas_scale / rho_scale);
   rho_0 = pin->GetReal("problem", "rho_0");
   pgas_0 = pin->GetReal("problem", "pgas_0");
-  overdensity_factor = pin->GetReal("problem", "overdensity_factor");
-  overdensity_radius = pin->GetReal("problem", "overdensity_radius");
   temperature_max = pin->GetReal("hydro", "tceil");
 
   // Read cooling-table-related parameters from input file
@@ -110,28 +100,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
       pin->GetOrAddInteger("problem", "num_hydrogen_densities_override", 0);
   int num_temperatures = pin->GetOrAddInteger("problem", "num_temperatures_override", 0);
   heat_redistribute = pin->GetBoolean("problem", "heat_redistribute");
-  constant_energy = pin->GetBoolean("problem", "constant_energy");
-  adaptive_driving = pin->GetBoolean("problem", "adaptive_driving");
-  tophat_driving = pin->GetBoolean("problem", "tophat_driving");
 
   t_cool_start = pin->GetReal("problem", "t_cool_start");
 
-
-  drive_duration   = pin->GetReal("problem", "drive_duration");
-  drive_separation = pin->GetReal("problem", "drive_separation");
-  dedt_on = pin->GetReal("problem", "dedt");
-
-
-  // conduction
-  kappa = pin->GetReal("problem", "kappa");
-  conduction_on = pin->GetBoolean("problem", "conduction_on");
+  // cooling
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
-
-  // gravity
-  grav_accel = pin->GetReal("problem", "grav_accel");
-  gravity_on = pin->GetBoolean("problem", "gravity_on");
-
 
   // Open cooling data file
   hid_t property_list_file = H5Pcreate(H5P_FILE_ACCESS);
@@ -630,7 +604,7 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
             rho_fraction, pgas_fraction);
 
         // Apply cooling and heating
-        Real delta_e = -edot_cool(k,j,i) * dt + delta_e_redist;
+        Real delta_e = -edot_cool(k,j,i) * dt;
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
         delta_e = std::max(delta_e, -u);
