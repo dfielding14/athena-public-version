@@ -99,11 +99,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   int num_hydrogen_densities =
       pin->GetOrAddInteger("problem", "num_hydrogen_densities_override", 0);
   int num_temperatures = pin->GetOrAddInteger("problem", "num_temperatures_override", 0);
-  heat_redistribute = pin->GetBoolean("problem", "heat_redistribute");
-
-  t_cool_start = pin->GetReal("problem", "t_cool_start");
 
   // cooling
+  t_cool_start = pin->GetReal("problem", "t_cool_start");
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
 
