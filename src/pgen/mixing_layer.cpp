@@ -28,7 +28,7 @@
 #endif
 
 // Declarations
-void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
+void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons);
 Real CoolingLosses(MeshBlock *pmb, int iout);
 static void FindIndex(const AthenaArray<double> &array, Real value, int *p_index,
@@ -54,13 +54,10 @@ static Real cooling_timestep(MeshBlock *pmb);
 static int turb_grid_size;
 static Real kappa;
 static bool conduction_on;
-static Real dt_cutoff;
+static Real dt_cutoff, cfl_cool;
 
 static Real grav_accel;
 static bool gravity_on;
-
-// static Real dt_drive; // the duration of driving
-// static Real deltat_drive; // the spacing between driving windows
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -129,6 +126,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   kappa = pin->GetReal("problem", "kappa");
   conduction_on = pin->GetBoolean("problem", "conduction_on");
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
+  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
 
   // gravity
   grav_accel = pin->GetReal("problem", "grav_accel");
@@ -356,7 +354,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   cooling_metals_table.DeleteAthenaArray();
 
   // Enroll user-defined functions
-  EnrollUserExplicitSourceFunction(Cooling_Conduction_TurbDriving);
+  EnrollUserExplicitSourceFunction(Cooling_Source_Function);
   AllocateUserHistoryOutput(2);
   EnrollUserHistoryOutput(0, CoolingLosses, "e_cool");
   EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
@@ -410,8 +408,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     ku += (NGHOST);
   }
 
-  Real cs_iso_squared = pgas_0/rho_0;
-  Real grav_z_offset = pin->GetReal("problem", "grav_z_offset");
+
+  Real smoothing_thickness = pin->GetReal("problem", "smoothing_thickness");
+  Real density_contrast = pin->GetReal("problem", "density_contrast");
+  Real velocity = pin->GetReal("problem", "velocity");
+  Real velocity_pert = pin->GetReal("problem", "velocity_pert");
+  Real lambda_pert = pin->GetReal("problem", "lambda_pert");
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     Real z = pcoord->x3v(k);
@@ -419,17 +421,16 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       Real y = pcoord->x2v(j);
       for (int i = il; i <= iu; ++i) {
         Real x = pcoord->x1v(i);
-        phydro->w(IDN,k,j,i) = rho_0;
-        if (gravity_on){
-          phydro->w(IDN,k,j,i) *= std::exp(-1.*grav_accel*std::abs(z-grav_z_offset)/cs_iso_squared);
+        phydro->w(IDN,k,j,i) = 1.0/sqrt(density_contrast) * (1.0 + 0.5*(density_contrast+1.0)*(1.0 + std::tanh(z/smoothing_thickness)));
+        phydro->w(IPR,k,j,i) = pgas_0;
+        phydro->w(IVX,k,j,i) = velocity * 0.5 * ( 1.0 - std::tanh(z/smoothing_thickness) );
+        if (block_size.nx3 > 1) {
+          phydro->w(IVY,k,j,i) = 0.0;
+          phydro->w(IVZ,k,j,i) = velocity_pert * std::exp(-SQR(z/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
+        } else {
+          phydro->w(IVY,k,j,i) = velocity_pert * std::exp(-SQR(z/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
+          phydro->w(IVZ,k,j,i) = 0.0;
         }
-        phydro->w(IPR,k,j,i) = cs_iso_squared * phydro->w(IDN,k,j,i);
-        phydro->w(IVX,k,j,i) = 0.0;
-        phydro->w(IVY,k,j,i) = 0.0;
-        phydro->w(IVZ,k,j,i) = 0.0;
-        if ( sqrt(x*x + y*y + z*z) < overdensity_radius) {
-          phydro->w(IDN,k,j,i) = overdensity_factor * rho_0;
-        } 
       }
     }
   }
@@ -463,11 +464,7 @@ Real cooling_timestep(MeshBlock *pmb)
             Real dt;
             Real edot = fabs(edot_cool(k,j,i));
             Real press = pmb->phydro->w(IPR,k,j,i);
-            if (conduction_on){
-              dt = 0.25 * std::min( SQR(pmb->pcoord->dx1f(i))/kappa , 1.5*press/edot); // experiment with that 0.25
-            } else {
-              dt = 0.25 * 1.5*press/edot;
-            }
+            dt = cfl_cool * 1.5*press/edot;
             dt = std::max( dt , dt_cutoff );
             min_dt = std::min(min_dt, dt);
           }
@@ -493,9 +490,8 @@ Real cooling_timestep(MeshBlock *pmb)
 //   writes to user_out_var array the following quantities:
 //     0: edot_cool
 //     1: T
-//     3: edot_cond
 
-void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
+void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
 {
   // Prepare values to aggregate
@@ -592,38 +588,6 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
     delta_e_tot = pmb->pmy_mesh->ruser_mesh_data[4](0);
   }
 
-
-  Real &dedt = pmb->pmy_mesh->ptrbd->dedt;
-
-  // Calculate amount of heat to redistribute
-  Real delta_e_redist = 0.0;
-  if (heat_redistribute) {
-    delta_e_redist = delta_e_tot / vol_tot;
-    if (constant_energy) {
-      delta_e_redist = std::max(delta_e_redist - dedt/vol_tot * dt, 0.0);
-    }
-    if(Globals::my_rank==0) {
-      std::cout << "heat_redistribute delta_e_tot / vol_tot = " << delta_e_tot / vol_tot << " dedt * dt " << dedt/ vol_tot * dt << "\n";
-    }
-  }
-
-  if (adaptive_driving) {
-    dedt = std::max(delta_e_tot / dt, 0.0);
-    if(Globals::my_rank==0) {
-      std::cout << "adaptive_driving dedt " << dedt << "\n";
-    }
-  }
-
-  // if (t%drive_separation <= drive_duration){  }
-
-  if (tophat_driving){
-    dedt = dedt_on * (0.5*(1.0+std::tanh((fmod(t,drive_separation)-((drive_separation-drive_duration)/2.))/(drive_separation/100.))) 
-                    - 0.5*(1.0+std::tanh((fmod(t,drive_separation)-((drive_separation+drive_duration)/2.))/(drive_separation/100.))));
-    if(Globals::my_rank==0) {
-      std::cout << "tophat_driving dedt " << dedt << "\n";
-    }
-  }
-
   // Extract indices
   int is = pmb->is;
   int ie = pmb->ie;
@@ -700,19 +664,6 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
   temperature_table.DeleteAthenaArray();
   edot_cool.DeleteAthenaArray();
   temperature.DeleteAthenaArray();
-
-  // gravity 
-  if (gravity_on){
-    for (int k=pmb->ks; k<=pmb->ke; ++k) {
-      for (int j=pmb->js; j<=pmb->je; ++j) {
-        for (int i=pmb->is; i<=pmb->ie; ++i) {
-          Real delta_vz = dt*grav_accel;
-          cons(IM3,k,j,i) -= prim(IDN,k,j,i) * delta_vz;
-          if (NON_BAROTROPIC_EOS) cons(IEN,k,j,i) -= 0.5*prim(IDN,k,j,i)*(2.*delta_vz*prim(IVZ,k,j,i) - SQR(delta_vz));
-        }
-      }
-    }
-  }
 
   return;
 }
