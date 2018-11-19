@@ -393,7 +393,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       Real y = pcoord->x2v(j);
       for (int i = il; i <= iu; ++i) {
         Real x = pcoord->x1v(i);
-        phydro->w(IDN,k,j,i) = 1.0/sqrt(density_contrast) * (1.0 + 0.5*(density_contrast+1.0)*(1.0 + std::tanh(z/smoothing_thickness)));
+        phydro->w(IDN,k,j,i) = rho_0/sqrt(density_contrast) * (1.0 + 0.5*(density_contrast+1.0)*(1.0 + std::tanh(z/smoothing_thickness)));
         phydro->w(IPR,k,j,i) = pgas_0;
         phydro->w(IVX,k,j,i) = velocity * 0.5 * ( 1.0 - std::tanh(z/smoothing_thickness) );
         if (block_size.nx3 > 1) {
