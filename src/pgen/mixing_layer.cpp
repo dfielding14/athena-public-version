@@ -400,7 +400,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IVY,k,j,i) = 0.0;
           phydro->w(IVZ,k,j,i) = velocity_pert * std::exp(-SQR(z/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
         } else {
-          phydro->w(IVY,k,j,i) = velocity_pert * std::exp(-SQR(z/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
+          phydro->w(IVY,k,j,i) = velocity_pert * std::exp(-SQR(y/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert);
           phydro->w(IVZ,k,j,i) = 0.0;
         }
       }
