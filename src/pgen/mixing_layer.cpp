@@ -393,13 +393,16 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       Real y = pcoord->x2v(j);
       for (int i = il; i <= iu; ++i) {
         Real x = pcoord->x1v(i);
-        phydro->w(IDN,k,j,i) = rho_0/sqrt(density_contrast) * (1.0 + 0.5*(density_contrast+1.0)*(1.0 + std::tanh(z/smoothing_thickness)));
-        phydro->w(IPR,k,j,i) = pgas_0;
-        phydro->w(IVX,k,j,i) = velocity * 0.5 * ( 1.0 - std::tanh(z/smoothing_thickness) );
         if (block_size.nx3 > 1) {
+          phydro->w(IDN,k,j,i) = rho_0/sqrt(density_contrast) * (1.0 + 0.5*(density_contrast+1.0)*(1.0 + std::tanh(z/smoothing_thickness)));
+          phydro->w(IPR,k,j,i) = pgas_0;
+          phydro->w(IVX,k,j,i) = velocity * 0.5 * ( 1.0 - std::tanh(z/smoothing_thickness) );
           phydro->w(IVY,k,j,i) = 0.0;
           phydro->w(IVZ,k,j,i) = velocity_pert * std::exp(-SQR(z/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
         } else {
+          phydro->w(IDN,k,j,i) = rho_0/sqrt(density_contrast) * (1.0 + 0.5*(density_contrast+1.0)*(1.0 + std::tanh(y/smoothing_thickness)));
+          phydro->w(IPR,k,j,i) = pgas_0;
+          phydro->w(IVX,k,j,i) = velocity * 0.5 * ( 1.0 - std::tanh(y/smoothing_thickness) );
           phydro->w(IVY,k,j,i) = velocity_pert * std::exp(-SQR(y/smoothing_thickness)) * std::sin(2*PI*x/lambda_pert);
           phydro->w(IVZ,k,j,i) = 0.0;
         }
