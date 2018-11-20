@@ -400,12 +400,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IPR,k,j,i) = pgas_0;
           phydro->w(IVX,k,j,i) = velocity * ( 1.0 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
           phydro->w(IVY,k,j,i) = 0.0;
-          phydro->w(IVZ,k,j,i) = velocity_pert * (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_bot)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
+          phydro->w(IVZ,k,j,i) = velocity_pert * (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
         } else {
           phydro->w(IDN,k,j,i) = rho_0/sqrt(density_contrast) * (1.0 + density_contrast * 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ) );
           phydro->w(IPR,k,j,i) = pgas_0;
           phydro->w(IVX,k,j,i) = velocity * ( 1.0 - 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ) );
-          phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_bot)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
+          phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
           phydro->w(IVZ,k,j,i) = 0.0;
         }
       }
