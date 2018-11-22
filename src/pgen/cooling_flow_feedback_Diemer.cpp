@@ -992,7 +992,7 @@ static Real grav_accel(Real r)
           sqrt(2.)*rs_rt*(-5. + 14.*pow(rs_rt,2.) + 12.*pow(rs_rt,4.) - 2.*pow(rs_rt,6.) + pow(rs_rt,8.))*
            (std::log(1. + rs_rt*x*(-sqrt(2.) + rs_rt*x)) - std::log(1. + rs_rt*x*(sqrt(2.) + rs_rt*x)))))/pow(1. + pow(rs_rt,4.),3.))/(96.*pow(x,2.));
 
-  Real g += GMgal / (r*(r+Rgal));
+  g += GMgal / (r*(r+Rgal));
   return g ; 
 }
 
