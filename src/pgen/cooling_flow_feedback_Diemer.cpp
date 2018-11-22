@@ -57,7 +57,7 @@ static bool conduction_on;
 static Real dt_cutoff, cfl_cool;
 static Real pfloor, dfloor, vceil;
 
-static Real Mhalo, cnfw, GMhalo, rvir, Mgal, GMgal, Rgal;
+static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs;
@@ -179,8 +179,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real redshift= 0.0;
   rhom    = (3. * SQR(H0) * Om * pow(1.+redshift,3))/(2.*FourPiG) / rho_scale;
   Real rhoc    = (3. * SQR(H0))/(2.*FourPiG) / rho_scale;
-  rho0    = Mhalo / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
   Real rs      = rvir/cnfw;
+  rho0    = Mhalo / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
   Real nu     = pin->GetReal("problem", "nu"); // Diemer+14 figure 1
   Real rt     = (1.9-0.18*nu)*rvir;
 
@@ -980,7 +980,7 @@ static Real grav_accel(Real r)
 
   Real x = r/(rvir/cnfw);
 
-  g = (64.*pow(aaa,1.5)*rhom*pow(x,1.5) + 32.*rhom*pow(x,3.) + (96.*rho0)/(pow(1. + pow(rs_rt,4.),2.)*(1. + x)) - 
+  Real g = (64.*pow(aaa,1.5)*rhom*pow(x,1.5) + 32.*rhom*pow(x,3.) + (96.*rho0)/(pow(1. + pow(rs_rt,4.),2.)*(1. + x)) - 
      (24.*rho0*(-1. + pow(rs_rt,4.)*(3. + x*(-4. + x*(3. - 2.*x + pow(rs_rt,4.)*(-1. + 2.*x))))))/
       (pow(1. + pow(rs_rt,4.),2.)*(1. + pow(rs_rt,4.)*pow(x,4.))) + 
      (12.*rs_rt*(-5.*sqrt(2.) + rs_rt*(18. - 14.*sqrt(2.)*rs_rt + 12.*sqrt(2.)*pow(rs_rt,3.) - 16.*pow(rs_rt,4.) + 2.*sqrt(2.)*pow(rs_rt,5.) + sqrt(2.)*pow(rs_rt,7.) - 
@@ -990,7 +990,7 @@ static Real grav_accel(Real r)
                 sqrt(2.)*pow(rs_rt,7.) + 2.*pow(rs_rt,8.)))*std::atan(1. + sqrt(2.)*rs_rt*x) + 16.*(1. - 7.*pow(rs_rt,4.))*std::log(1. + x) + 
           4.*(-1. + 7.*pow(rs_rt,4.))*std::log(1. + pow(rs_rt,4.)*pow(x,4.)) - 
           sqrt(2.)*rs_rt*(-5. + 14.*pow(rs_rt,2.) + 12.*pow(rs_rt,4.) - 2.*pow(rs_rt,6.) + pow(rs_rt,8.))*
-           (std::log(1. + rs_rt*x*(-sqrt(2.) + rs_rt*x)) - std::log(1. + rs_rt*x*(sqrt(2.) + rs_rt*x)))))/pow(1. + pow(rs_rt,4.),3.))/(96.*pow(x,2.))
+           (std::log(1. + rs_rt*x*(-sqrt(2.) + rs_rt*x)) - std::log(1. + rs_rt*x*(sqrt(2.) + rs_rt*x)))))/pow(1. + pow(rs_rt,4.),3.))/(96.*pow(x,2.));
 
   Real g += GMgal / (r*(r+Rgal));
   return g ; 
