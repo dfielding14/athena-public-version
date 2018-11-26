@@ -48,7 +48,7 @@ static bool heat_redistribute, constant_energy;
 static bool adaptive_driving, tophat_driving;
 static Real drive_duration, drive_separation, dedt_on;
 static Real beta;
-static Real grav_scale_inner, grav_scale_outer, rs_5rvir, rs_rt;
+static Real grav_scale_inner, aaa, rs_rt, rhom, rho0;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static int turb_grid_size;
@@ -57,7 +57,7 @@ static bool conduction_on;
 static Real dt_cutoff, cfl_cool;
 static Real pfloor, dfloor, vceil;
 
-static Real Mhalo, cnfw, GMhalo, rvir, Mgal, GMgal, Rgal;
+static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs;
@@ -169,25 +169,24 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   cnfw         = pin->GetReal("problem", "cnfw"); 
   rvir         = pin->GetReal("problem", "rvir"); // in kpc
   rvir         = rvir * kpc/length_scale;
+  r200m        = pin->GetReal("problem", "r200m"); // in kpc
+  r200m        = r200m * kpc/length_scale;
   GMhalo       = (G * Mhalo * Msun) / (pow(length_scale,3)/SQR(time_scale));
   GMgal        = (G * Mgal * Msun) / (pow(length_scale,3)/SQR(time_scale));
   Real FourPiG = 8.385539110961876e-07;
   Real H0      = 2.268308489954634e-18;
   Real Om      = 0.27;
   Real redshift= 0.0;
-  Real rhom    = (3. * SQR(H0) * Om * pow(1.+redshift,3))/(2.*FourPiG);
-  Real rhoc    = (3. * SQR(H0))/(2.*FourPiG);
-  Real deltac  = (200./3.) * pow(cnfw,3) * 1.0/(std::log(1.0+cnfw) - cnfw/(1.0+cnfw));
-  Real rhos    = deltac*rhoc;
+  rhom    = (3. * SQR(H0) * Om * pow(1.+redshift,3))/(2.*FourPiG) / rho_scale;
+  Real rhoc    = (3. * SQR(H0))/(2.*FourPiG) / rho_scale;
   Real rs      = rvir/cnfw;
-  grav_scale_inner = FourPiG*rhos*rs*SQR(time_scale);
-  grav_scale_outer = FourPiG*rhom*rs*SQR(time_scale);
-
-
+  rho0    = Mhalo / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
   Real nu     = pin->GetReal("problem", "nu"); // Diemer+14 figure 1
   Real rt     = (1.9-0.18*nu)*rvir;
 
-  rs_5rvir = rs/(5.*rvir);
+  grav_scale_inner = FourPiG*rs*SQR(time_scale) / rho_scale;
+
+  aaa = rs/(5.*rvir);
   rs_rt = rs/rt;
 
   Real x_outer = r_outer/rvir; 
@@ -981,21 +980,19 @@ static Real grav_accel(Real r)
 
   Real x = r/(rvir/cnfw);
 
-  Real A = grav_scale_inner * 
-    (4.*(7.*pow(rs_rt,4) - 1.)*std::log(pow(rs_rt,4)*pow(x,4) + 1.) 
-      + (16.*(pow(rs_rt,4) + 1.))/(x + 1.) 
-      + 16.*(1. - 7.*pow(rs_rt,4))*std::log(x + 1.) 
-      + (4.*(pow(rs_rt,4) + 1.)*(pow(rs_rt,8)*(pow(x,2) - 2.*pow(x,3.)) + pow(rs_rt,4)*(2.*pow(x,3.) - 3.*pow(x,2) + 4.*x - 3.) + 1.))/(pow(rs_rt,4)*pow(x,4) + 1.) 
-      - sqrt(2.)*rs_rt*(pow(rs_rt,8) - 2.*pow(rs_rt,6) + 12.*pow(rs_rt,4) + 14.*pow(rs_rt,2) - 5.)*std::log(pow(rs_rt,2)*pow(x,2) - sqrt(2.)*rs_rt*x + 1.) 
-      + sqrt(2.)*rs_rt*(pow(rs_rt,8) - 2.*pow(rs_rt,6) + 12.*pow(rs_rt,4) + 14.*pow(rs_rt,2) - 5.)*std::log(pow(rs_rt,2)*pow(x,2) + sqrt(2.)*rs_rt*x + 1.) 
-      + 2.*(PI*pow(rs_rt,10) + 6*pow(rs_rt,8) + 8*PI*pow(rs_rt,6) - 4.*pow(rs_rt,4) - 9*PI*pow(rs_rt,2) - 10) 
-      - 2.*rs_rt*(2.*pow(rs_rt,9) + sqrt(2.)*pow(rs_rt,8) + 2.*sqrt(2.)*pow(rs_rt,6) + 16.*pow(rs_rt,5) + 12.*sqrt(2.)*pow(rs_rt,4) - 14.*sqrt(2.)*pow(rs_rt,2) - 18*rs_rt - 5.*sqrt(2.))*std::atan(sqrt(2.)*rs_rt*x + 1.) 
-      - 2.*rs_rt*(2.*pow(rs_rt,9) - sqrt(2.)*pow(rs_rt,8) - 2.*sqrt(2.)*pow(rs_rt,6) + 16.*pow(rs_rt,5) - 12.*sqrt(2.)*pow(rs_rt,4) + 14.*sqrt(2.)*pow(rs_rt,2) - 18*rs_rt + 5.*sqrt(2.))*std::atan(1. - sqrt(2.)*rs_rt*x))
-    /(16.*pow(pow(rs_rt,4) + 1.,3));
+  Real g = (64.*pow(aaa,1.5)*rhom*pow(x,1.5) + 32.*rhom*pow(x,3.) + (96.*rho0)/(pow(1. + pow(rs_rt,4.),2.)*(1. + x)) - 
+     (24.*rho0*(-1. + pow(rs_rt,4.)*(3. + x*(-4. + x*(3. - 2.*x + pow(rs_rt,4.)*(-1. + 2.*x))))))/
+      (pow(1. + pow(rs_rt,4.),2.)*(1. + pow(rs_rt,4.)*pow(x,4.))) + 
+     (12.*rs_rt*(-5.*sqrt(2.) + rs_rt*(18. - 14.*sqrt(2.)*rs_rt + 12.*sqrt(2.)*pow(rs_rt,3.) - 16.*pow(rs_rt,4.) + 2.*sqrt(2.)*pow(rs_rt,5.) + sqrt(2.)*pow(rs_rt,7.) - 
+             2.*pow(rs_rt,8.)))*rho0*std::atan(1. - sqrt(2.)*rs_rt*x))/pow(1. + pow(rs_rt,4.),3.) + 
+     (6.*rho0*(4.*(1. + pow(rs_rt,4.))*(-5. + 3.*pow(rs_rt,4.)) + 2.*pow(rs_rt,2.)*(-9. + 8.*pow(rs_rt,4.) + pow(rs_rt,8.))*PI - 
+          2.*rs_rt*(-5.*sqrt(2.) + rs_rt*(-18. - 14.*sqrt(2.)*rs_rt + 12.*sqrt(2.)*pow(rs_rt,3.) + 16.*pow(rs_rt,4.) + 2.*sqrt(2.)*pow(rs_rt,5.) + 
+                sqrt(2.)*pow(rs_rt,7.) + 2.*pow(rs_rt,8.)))*std::atan(1. + sqrt(2.)*rs_rt*x) + 16.*(1. - 7.*pow(rs_rt,4.))*std::log(1. + x) + 
+          4.*(-1. + 7.*pow(rs_rt,4.))*std::log(1. + pow(rs_rt,4.)*pow(x,4.)) - 
+          sqrt(2.)*rs_rt*(-5. + 14.*pow(rs_rt,2.) + 12.*pow(rs_rt,4.) - 2.*pow(rs_rt,6.) + pow(rs_rt,8.))*
+           (std::log(1. + rs_rt*x*(-sqrt(2.) + rs_rt*x)) - std::log(1. + rs_rt*x*(sqrt(2.) + rs_rt*x)))))/pow(1. + pow(rs_rt,4.),3.))/(96.*pow(x,2.));
 
-  Real B = grav_scale_outer * ((2.*pow(x,(3./2.)))/(3.*pow(rs_5rvir,(3./2.))) + (pow(x,3.))/3.);
-
-  Real g = (A + B)/SQR(x) + GMgal / (r*(r+Rgal));
+  g += GMgal / (r*(r+Rgal));
   return g ; 
 }
 
