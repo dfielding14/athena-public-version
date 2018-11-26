@@ -123,7 +123,7 @@ void TurbulenceDriver::Driving(void) {
       break;
     case 4: // turb_flag == 4 : density perturbation
       if(pm->time==0.0){
-        Generate1D()
+        Generate1D();
         PerturbDensity();
         if (Globals::my_rank==0)
           std::cout << "Perturbed Density at " << pm->time << std::endl;
