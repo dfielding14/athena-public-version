@@ -45,7 +45,7 @@ static Real overdensity_factor, overdensity_radius;
 static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
 static Real pgas_table_min, pgas_table_max, pgas_table_n;
-static Real t_cool_start;
+static Real t_cool_start, cfl_cool;
 static bool heat_redistribute, constant_energy;
 static bool adaptive_driving, tophat_driving;
 static Real drive_duration, drive_separation, dedt_on;
@@ -118,6 +118,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   tophat_driving = pin->GetBoolean("problem", "tophat_driving");
 
   t_cool_start = pin->GetReal("problem", "t_cool_start");
+  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
 
 
   drive_duration   = pin->GetReal("problem", "drive_duration");
@@ -464,9 +465,9 @@ Real cooling_timestep(MeshBlock *pmb)
             Real edot = fabs(edot_cool(k,j,i));
             Real press = pmb->phydro->w(IPR,k,j,i);
             if (conduction_on){
-              dt = 0.25 * std::min( SQR(pmb->pcoord->dx1f(i))/kappa , 1.5*press/edot); // experiment with that 0.25
+              dt = cfl_cool * std::min( SQR(pmb->pcoord->dx1f(i))/kappa , 1.5*press/edot); // experiment with that cfl_cool
             } else {
-              dt = 0.25 * 1.5*press/edot;
+              dt = cfl_cool * 1.5*press/edot;
             }
             dt = std::max( dt , dt_cutoff );
             min_dt = std::min(min_dt, dt);
