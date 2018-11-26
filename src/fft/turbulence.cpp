@@ -103,7 +103,7 @@ void TurbulenceDriver::Driving(void) {
   bool new_perturb = false;
 
 // check driving time interval to generate new perturbation
-  if (pm->time >= tdrive) {
+  if ((pm->time >= tdrive) and (pm->turb_flag != 4)) {
     if (Globals::my_rank==0)
       std::cout << "generating turbulence at " << pm->time << std::endl;
     Generate();
@@ -122,7 +122,12 @@ void TurbulenceDriver::Driving(void) {
       Perturb(pm->dt);
       break;
     case 4: // turb_flag == 4 : density perturbation
-      PerturbDensity();
+      if(pm->time==0.0){
+        Generate1D()
+        PerturbDensity();
+        if (Globals::my_rank==0)
+          std::cout << "Perturbed Density at " << pm->time << std::endl;
+      }
       break;
     default:
       std::stringstream msg;
