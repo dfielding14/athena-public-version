@@ -669,6 +669,9 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
 
         // Apply cooling and heating
         if (rho_dependent_heat_redistribute){
+          if(Globals::my_rank==0) {
+            std::cout << "rho_dependent_heat_redistribute  delta_e_redist_before = " << delta_e_redist << " after " << delta_e_redist * (rho * vol_cell)/(rho_0 * vol_tot)  << "\n";
+          }
           delta_e_redist *= (rho * vol_cell)/(rho_0 * vol_tot);
         }
         Real delta_e = -edot_cool(k,j,i) * dt + delta_e_redist;
