@@ -668,10 +668,11 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
             rho_fraction, pgas_fraction);
 
         // Apply cooling and heating
+        Real delta_e = -edot_cool(k,j,i) * dt;
         if (rho_dependent_heat_redistribute){
-          Real delta_e = -edot_cool(k,j,i) * dt + delta_e_redist * rho/rho_0;
+          delta_e += delta_e_redist * rho/rho_0;
         } else {
-          Real delta_e = -edot_cool(k,j,i) * dt + delta_e_redist;
+          delta_e += delta_e_redist;
         }
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
