@@ -46,7 +46,7 @@ static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
 static Real pgas_table_min, pgas_table_max, pgas_table_n;
 static Real t_cool_start, cfl_cool;
-static bool heat_redistribute, constant_energy;
+static bool heat_redistribute, rho_dependent_heat_redistribute, constant_energy;
 static bool adaptive_driving, tophat_driving;
 static Real drive_duration, drive_separation, dedt_on;
 
@@ -113,6 +113,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
       pin->GetOrAddInteger("problem", "num_hydrogen_densities_override", 0);
   int num_temperatures = pin->GetOrAddInteger("problem", "num_temperatures_override", 0);
   heat_redistribute = pin->GetBoolean("problem", "heat_redistribute");
+  rho_dependent_heat_redistribute = pin->GetBoolean("problem", "rho_dependent_heat_redistribute");
   constant_energy = pin->GetBoolean("problem", "constant_energy");
   adaptive_driving = pin->GetBoolean("problem", "adaptive_driving");
   tophat_driving = pin->GetBoolean("problem", "tophat_driving");
@@ -667,6 +668,9 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
             rho_fraction, pgas_fraction);
 
         // Apply cooling and heating
+        if (rho_dependent_heat_redistribute){
+          delta_e_redist *= (rho * vol_cell)/(rho_0 * vol_tot);
+        }
         Real delta_e = -edot_cool(k,j,i) * dt + delta_e_redist;
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
