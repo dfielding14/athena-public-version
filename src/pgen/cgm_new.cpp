@@ -41,7 +41,7 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
 static const Real mu_m_h = 1.008 * 1.660539040e-24;
 static Real gamma_adi;
 static Real rho_0, pgas_0;
-static Real overdensity_factor, overdensity_radius;
+static Real overdensity_factor, overdensity_radius, overdensity_smoothing_length;
 static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
 static Real pgas_table_min, pgas_table_max, pgas_table_n;
@@ -95,6 +95,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   pgas_0 = pin->GetReal("problem", "pgas_0");
   overdensity_factor = pin->GetReal("problem", "overdensity_factor");
   overdensity_radius = pin->GetReal("problem", "overdensity_radius");
+  overdensity_smoothing_length = pin->GetReal("problem", "overdensity_smoothing_length");
   temperature_max = pin->GetReal("hydro", "tceil");
 
   // Read cooling-table-related parameters from input file
@@ -429,8 +430,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IVX,k,j,i) = 0.0;
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = 0.0;
-        if ( sqrt(x*x + y*y + z*z) < overdensity_radius) {
-          phydro->w(IDN,k,j,i) = overdensity_factor * rho_0;
+        if (overdensity_factor > 0.0){
+          r = sqrt(x*x + y*y + z*z); 
+          phydro->w(IDN,k,j,i) = rho_0 * ((overdensity_factor-1) * 0.5 * (1.0 + std::tanh((overdensity_radius - r)/overdensity_smoothing_length))+1.0);
         } 
       }
     }
