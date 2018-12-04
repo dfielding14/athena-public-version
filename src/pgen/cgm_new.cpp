@@ -431,7 +431,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = 0.0;
         if (overdensity_factor > 0.0){
-          r = sqrt(x*x + y*y + z*z); 
+          Real r = sqrt(x*x + y*y + z*z); 
           phydro->w(IDN,k,j,i) = rho_0 * ((overdensity_factor-1) * 0.5 * (1.0 + std::tanh((overdensity_radius - r)/overdensity_smoothing_length))+1.0);
         } 
       }
