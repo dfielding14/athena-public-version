@@ -429,7 +429,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 Real cooling_timestep(MeshBlock *pmb)
 {
   Real min_dt=1.0e10;
-  if (t >= t_start_cooling) {
+  if (pmb->pmy_mesh->time >= t_start_cooling) {
     for (int k=pmb->ks; k<=pmb->ke; ++k) {
       for (int j=pmb->js; j<=pmb->je; ++j) {
         for (int i=pmb->is; i<=pmb->ie; ++i) {
