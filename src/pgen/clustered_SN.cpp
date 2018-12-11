@@ -38,6 +38,7 @@ static Real v_max, dt_cutoff;
 static Real dt_SN, t_last_SN, t_start_SN, r_inj_sq;
 static int i_SN;
 static Real E_SN, P_SN, ejecta_mass;
+static Real beta;
 
 Real x_SN[300]={0.};
 Real y_SN[300]={0.};
@@ -180,6 +181,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real x_SN_offset        = pin->GetOrAddReal("problem", "x_SN_offset", 0.0);
   Real y_SN_offset        = pin->GetOrAddReal("problem", "y_SN_offset", 0.0);
   Real z_SN_offset        = pin->GetOrAddReal("problem", "z_SN_offset", 0.0);
+
+
+  if (MAGNETIC_FIELDS_ENABLED) {
+    beta             = pin->GetReal("problem", "beta");
+  }
 
 
   // Set up a list of SNe locations and times, same for all processors
@@ -380,13 +386,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   // initialize interface B, assuming vertical field only B=(0,0,1)
   if (MAGNETIC_FIELDS_ENABLED) {
-    Real b = std::sqrt(2.0/beta);
+    Real bfield = std::sqrt(2.0/beta);
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie+1; i++) {
           pfield->b.x1f(k,j,i) = 0.0;
           pfield->b.x2f(k,j,i) = 0.0;
-          pfield->b.x3f(k,j,i) = b;
+          pfield->b.x3f(k,j,i) = bfield;
         }
       }
     }
@@ -399,11 +405,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       }
     }
     // Initialize conserved values
-    peos->PrimitiveToConserved(phydro->w, pfield->b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+    // peos->PrimitiveToConserved(phydro->w, pfield->b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   } else {
     // Initialize conserved values
-    AthenaArray<Real> b;
-    peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+    // AthenaArray<Real> b;
+    // peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   }
   return;
 }
