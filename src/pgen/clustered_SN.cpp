@@ -46,9 +46,9 @@ Real z_SN[300]={0.};
 
 static Real grav_accel( Real z );
 void NoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void NoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 Real CoolingLosses(MeshBlock *pmb, int iout);
 static Real cooling_timestep(MeshBlock *pmb);
 Real fluxes(MeshBlock *pmb, int iout);
@@ -360,7 +360,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     ku += (NGHOST);
   }
   Real cs2 = pgas_0/rho_0;
-
+  if(Globals::my_rank==0) {
+        std::cout << " NGHOST " << NGHOST << "\n";
+  }
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     Real z = pcoord->x3v(k);
@@ -837,15 +839,15 @@ static Real grav_accel( Real z )
 //----------------------------------------------------------------------------------------
 //! \fn void NoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke)
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
 //  \brief OUTFLOW boundary conditions with no inflow, inner x3 boundary
 
 void NoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke)
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
   // copy hydro variables into ghost zones
   for (int n=0; n<(NHYDRO); ++n) {
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=is; i<=ie; ++i) {
           prim(n,ks-k,j,i) = prim(n,ks,j,i);
@@ -861,21 +863,21 @@ void NoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
   // copy face-centered magnetic fields into ghost zones
   if (MAGNETIC_FIELDS_ENABLED) {
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie+1; ++i) {
         b.x1f((ks-k),j,i) = b.x1f(ks,j,i);
       }
     }}
 
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
     for (int j=js; j<=je+1; ++j) {
       for (int i=is; i<=ie; ++i) {
         b.x2f((ks-k),j,i) = b.x2f(ks,j,i);
       }
     }}
 
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
         b.x3f((ks-k),j,i) = b.x3f(ks,j,i);
@@ -889,15 +891,15 @@ void NoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //----------------------------------------------------------------------------------------
 //! \fn void NoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke)
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
 //  \brief OUTFLOW boundary conditions with no inflow, outer x3 boundary
 
 void NoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke)
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
   // copy hydro variables into ghost zones
   for (int n=0; n<(NHYDRO); ++n) {
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=is; i<=ie; ++i) {
           prim(n,ke+k,j,i) = prim(n,ke,j,i);
@@ -913,21 +915,21 @@ void NoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
   // copy face-centered magnetic fields into ghost zones
   if (MAGNETIC_FIELDS_ENABLED) {
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie+1; ++i) {
         b.x1f((ke+k  ),j,i) = b.x1f((ke  ),j,i);
       }
     }}
 
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
         b.x2f((ke+k  ),j,i) = b.x2f((ke  ),j,i);
       }
     }}
 
-    for (int k=1; k<=(NGHOST); ++k) {
+    for (int k=1; k<=(ngh); ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
         b.x3f((ke+k+1),j,i) = b.x3f((ke+1),j,i);
