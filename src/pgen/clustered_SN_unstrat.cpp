@@ -376,10 +376,33 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       }
     }
   }
-
-  // Initialize conserved values
-  AthenaArray<Real> b;
-  peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  // initialize interface B, assuming vertical field only B=(0,0,1)
+  if (MAGNETIC_FIELDS_ENABLED) {
+    Real b = std::sqrt(2.0/beta);
+    for (int k=ks; k<=ke; k++) {
+      for (int j=js; j<=je; j++) {
+        for (int i=is; i<=ie+1; i++) {
+          pfield->b.x1f(k,j,i) = 0.0;
+          pfield->b.x2f(k,j,i) = 0.0;
+          pfield->b.x3f(k,j,i) = b;
+        }
+      }
+    }
+    // initialize total energy
+    for (int k=ks; k<=ke; k++) {
+      for (int j=js; j<=je; j++) {
+        for (int i=is; i<=ie; i++) {
+          phydro->u(IEN,k,j,i) += beta;
+        }
+      }
+    }
+    // Initialize conserved values
+    peos->PrimitiveToConserved(phydro->w, pfield->b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  } else {
+    // Initialize conserved values
+    AthenaArray<Real> b;
+    peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  }
   return;
 }
 

@@ -63,7 +63,6 @@ static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs;
 
 static Real r_inner, r_outer;
-static Real f_shock, f_core;
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
@@ -174,19 +173,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   GMhalo       = (G * Mhalo * Msun) / (pow(length_scale,3)/SQR(time_scale));
   GMgal        = (G * Mgal * Msun) / (pow(length_scale,3)/SQR(time_scale));
   Real FourPiG = 8.385539110961876e-07;
-  Real H0      = 2.268308489954634e-18;
-  Real Om      = 0.27;
+  Real H0      = 2.1950745301360983e-18; // 2.268308489954634e-18;
+  Real Om      = 0.3075; // 0.27;
   Real redshift= 0.0;
-  rhom    = (3. * SQR(H0) * Om * pow(1.+redshift,3))/(2.*FourPiG) / rho_scale;
+  rhom         = (3. * SQR(H0) * Om * pow(1.+redshift,3))/(2.*FourPiG) / rho_scale;
   Real rhoc    = (3. * SQR(H0))/(2.*FourPiG) / rho_scale;
   Real rs      = rvir/cnfw;
-  rho0    = Mhalo / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
-  Real nu     = pin->GetReal("problem", "nu"); // Diemer+14 figure 1
-  Real rt     = (1.9-0.18*nu)*rvir;
+  rho0         = Mhalo * Msun / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
+  Real nu      = pin->GetReal("problem", "nu"); // Diemer+14 figure 1
+  Real rt      = (1.9-0.18*nu)*r200m;
 
-  grav_scale_inner = FourPiG*rs*SQR(time_scale) / rho_scale;
+  grav_scale_inner = FourPiG*rs*(SQR(time_scale)*rho_scale);
 
-  aaa = rs/(5.*rvir);
+  aaa = 5. * cnfw * r200m / rvir;
   rs_rt = rs/rt;
 
   Real x_outer = r_outer/rvir; 
@@ -196,13 +195,22 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     std::cout << " Mgal = " << Mgal << "\n";
     std::cout << " cnfw = " << cnfw << "\n";
     std::cout << " rvir = " << rvir << "\n";
+    std::cout << " Rgal = " << Rgal << "\n";
     std::cout << " GMhalo = " << GMhalo << "\n";
-    std::cout << " f_core = " << f_core << "\n";
+    std::cout << " GMgal = " << GMgal << "\n";
     std::cout << " r_inner = " << r_inner << "\n";
     std::cout << " r_outer = " << r_outer << "\n";
+    std::cout << " grav_scale_inner = " << grav_scale_inner << "\n";
+    std::cout << " rho0 = " << rho0 * rho_scale << "\n";
+    std::cout << " rhom = " << rhom * rho_scale << "\n";
+    std::cout << " aaa = " << aaa << "\n";
+    std::cout << " rs_rt = " << rs_rt << "\n";
+    std::cout << " g_in = " << grav_accel(r_inner) << "\n";
+    std::cout << " g_vir = " << grav_accel(rvir) << "\n";
+    std::cout << " g_out = " << grav_accel(r_outer) << "\n";
     std::cout << " n_ta = " << rho_ta * rho_scale/0.62/mp << "\n";
     std::cout << " vc_ta = " << sqrt(grav_accel(r_outer) * r_outer )*length_scale/time_scale / 1e5 << "\n";
-    std::cout << " P_ta = " << rho_ta * rho_scale/0.62/mp * f_cs * (grav_accel(r_outer) * r_outer )*SQR(length_scale/time_scale) << "\n";
+    std::cout << " P_ta = " << rho_ta * rho_scale/kb * f_cs * (grav_accel(r_outer) * r_outer )*SQR(length_scale/time_scale) << "\n";
     std::cout << " dt_cutoff = " << dt_cutoff << "\n";
   }
 
@@ -980,7 +988,7 @@ static Real grav_accel(Real r)
 
   Real x = r/(rvir/cnfw);
 
-  Real g = (64.*pow(aaa,1.5)*rhom*pow(x,1.5) + 32.*rhom*pow(x,3.) + (96.*rho0)/(pow(1. + pow(rs_rt,4.),2.)*(1. + x)) - 
+  Real g = grav_scale_inner * ((64.*pow(aaa,1.5)*rhom*pow(x,1.5) + 32.*rhom*pow(x,3.) + (96.*rho0)/(pow(1. + pow(rs_rt,4.),2.)*(1. + x)) - 
      (24.*rho0*(-1. + pow(rs_rt,4.)*(3. + x*(-4. + x*(3. - 2.*x + pow(rs_rt,4.)*(-1. + 2.*x))))))/
       (pow(1. + pow(rs_rt,4.),2.)*(1. + pow(rs_rt,4.)*pow(x,4.))) + 
      (12.*rs_rt*(-5.*sqrt(2.) + rs_rt*(18. - 14.*sqrt(2.)*rs_rt + 12.*sqrt(2.)*pow(rs_rt,3.) - 16.*pow(rs_rt,4.) + 2.*sqrt(2.)*pow(rs_rt,5.) + sqrt(2.)*pow(rs_rt,7.) - 
@@ -990,7 +998,7 @@ static Real grav_accel(Real r)
                 sqrt(2.)*pow(rs_rt,7.) + 2.*pow(rs_rt,8.)))*std::atan(1. + sqrt(2.)*rs_rt*x) + 16.*(1. - 7.*pow(rs_rt,4.))*std::log(1. + x) + 
           4.*(-1. + 7.*pow(rs_rt,4.))*std::log(1. + pow(rs_rt,4.)*pow(x,4.)) - 
           sqrt(2.)*rs_rt*(-5. + 14.*pow(rs_rt,2.) + 12.*pow(rs_rt,4.) - 2.*pow(rs_rt,6.) + pow(rs_rt,8.))*
-           (std::log(1. + rs_rt*x*(-sqrt(2.) + rs_rt*x)) - std::log(1. + rs_rt*x*(sqrt(2.) + rs_rt*x)))))/pow(1. + pow(rs_rt,4.),3.))/(96.*pow(x,2.));
+           (std::log(1. + rs_rt*x*(-sqrt(2.) + rs_rt*x)) - std::log(1. + rs_rt*x*(sqrt(2.) + rs_rt*x)))))/pow(1. + pow(rs_rt,4.),3.))/(96.*pow(x,2.)));
 
   g += GMgal / (r*(r+Rgal));
   return g ; 

@@ -377,9 +377,34 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     }
   }
 
-  // Initialize conserved values
-  AthenaArray<Real> b;
-  peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+
+  // initialize interface B, assuming vertical field only B=(0,0,1)
+  if (MAGNETIC_FIELDS_ENABLED) {
+    Real b = std::sqrt(2.0/beta);
+    for (int k=ks; k<=ke; k++) {
+      for (int j=js; j<=je; j++) {
+        for (int i=is; i<=ie+1; i++) {
+          pfield->b.x1f(k,j,i) = 0.0;
+          pfield->b.x2f(k,j,i) = 0.0;
+          pfield->b.x3f(k,j,i) = b;
+        }
+      }
+    }
+    // initialize total energy
+    for (int k=ks; k<=ke; k++) {
+      for (int j=js; j<=je; j++) {
+        for (int i=is; i<=ie; i++) {
+          phydro->u(IEN,k,j,i) += beta;
+        }
+      }
+    }
+    // Initialize conserved values
+    peos->PrimitiveToConserved(phydro->w, pfield->b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  } else {
+    // Initialize conserved values
+    AthenaArray<Real> b;
+    peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  }
   return;
 }
 
@@ -499,89 +524,15 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         const Real &v2 = prim(IVY,k,j,i);
         const Real &v3 = prim(IVZ,k,j,i);
         Real dA = pmb->pcoord->dx1v(k)*pmb->pcoord->dx2v(k);
-
-        // if ((std::abs(v1) > v_max)||(std::abs(v2) > v_max)||(std::abs(v3) > v_max)){
-        //   Real n_neighbs=0.0;
-        //   Real rho_neighbs = 0.0;
-        //   Real e_neighbs = 0.0;
-        //   Real m1_neighbs = 0.0;
-        //   Real m2_neighbs = 0.0;
-        //   Real m3_neighbs = 0.0;
-        //   if ((k+1<=ke)&&(fabs(prim(IVX,k+1,j,i))<v_max)&&(fabs(prim(IVY,k+1,j,i))<v_max)&&(fabs(prim(IVZ,k+1,j,i))<v_max)){
-        //     n_neighbs += 1.0;
-        //     rho_neighbs += cons(IDN,k+1,j,i);
-        //     e_neighbs   += cons(IEN,k+1,j,i);
-        //     m1_neighbs  += cons(IM1,k+1,j,i);
-        //     m2_neighbs  += cons(IM2,k+1,j,i);
-        //     m3_neighbs  += cons(IM3,k+1,j,i);
-        //   }
-        //   if ((k-1>=ks)&&(fabs(prim(IVX,k-1,j,i))<v_max)&&(fabs(prim(IVY,k-1,j,i))<v_max)&&(fabs(prim(IVZ,k-1,j,i))<v_max)){
-        //     n_neighbs += 1.0;
-        //     rho_neighbs += cons(IDN,k-1,j,i);
-        //     e_neighbs   += cons(IEN,k-1,j,i);
-        //     m1_neighbs  += cons(IM1,k-1,j,i);
-        //     m2_neighbs  += cons(IM2,k-1,j,i);
-        //     m3_neighbs  += cons(IM3,k-1,j,i);
-        //   }
-        //   if ((j+1<=je)&&(fabs(prim(IVX,k,j+1,i))<v_max)&&(fabs(prim(IVY,k,j+1,i))<v_max)&&(fabs(prim(IVZ,k,j+1,i))<v_max)){
-        //     n_neighbs += 1.0;
-        //     rho_neighbs += cons(IDN,k,j+1,i);
-        //     e_neighbs   += cons(IEN,k,j+1,i);
-        //     m1_neighbs  += cons(IM1,k,j+1,i);
-        //     m2_neighbs  += cons(IM2,k,j+1,i);
-        //     m3_neighbs  += cons(IM3,k,j+1,i);
-        //   }
-        //   if ((j-1>=js)&&(fabs(prim(IVX,k,j-1,i))<v_max)&&(fabs(prim(IVY,k,j-1,i))<v_max)&&(fabs(prim(IVZ,k,j-1,i))<v_max)){
-        //     n_neighbs += 1.0;
-        //     rho_neighbs += cons(IDN,k,j-1,i);
-        //     e_neighbs   += cons(IEN,k,j-1,i);
-        //     m1_neighbs  += cons(IM1,k,j-1,i);
-        //     m2_neighbs  += cons(IM2,k,j-1,i);
-        //     m3_neighbs  += cons(IM3,k,j-1,i);
-        //   }
-        //   if ((i+1<=ie)&&(fabs(prim(IVX,k,j,i+1))<v_max)&&(fabs(prim(IVY,k,j,i+1))<v_max)&&(fabs(prim(IVZ,k,j,i+1))<v_max)){
-        //    n_neighbs += 1.0;
-        //     rho_neighbs += cons(IDN,k,j,i+1);
-        //     e_neighbs   += cons(IEN,k,j,i+1);
-        //     m1_neighbs  += cons(IM1,k,j,i+1);
-        //     m2_neighbs  += cons(IM2,k,j,i+1);
-        //     m3_neighbs  += cons(IM3,k,j,i+1);
-        //   }
-        //   if ((i-1>=is)&&(fabs(prim(IVX,k,j,i-1))<v_max)&&(fabs(prim(IVY,k,j,i-1))<v_max)&&(fabs(prim(IVZ,k,j,i-1))<v_max)){
-        //     n_neighbs += 1.0;
-        //     rho_neighbs += cons(IDN,k,j,i-1);
-        //     e_neighbs   += cons(IEN,k,j,i-1);
-        //     m1_neighbs  += cons(IM1,k,j,i-1);
-        //     m2_neighbs  += cons(IM2,k,j,i-1);
-        //     m3_neighbs  += cons(IM3,k,j,i-1);
-        //   }
-        //   if (n_neighbs>0.0){
-        //     rho_neighbs /= n_neighbs;
-        //     e_neighbs   /= n_neighbs;
-        //     m1_neighbs  /= n_neighbs;
-        //     m2_neighbs  /= n_neighbs;
-        //     m3_neighbs  /= n_neighbs;
-        //     rho = rho_neighbs;
-        //     e = e_neighbs;
-        //     m1 = m1_neighbs;
-        //     m2 = m2_neighbs;
-        //     m3 = m3_neighbs;
-        //   } else {
-        //     m1 = 0.0 ;
-        //     m2 = 0.0 ;
-        //     m3 = 0.0 ;
-        //     e  = pgas_half / (gamma_adi-1.0);
-        //   }
-        //   std::cout << " v > v_max, v1 = " << v1 << " ks = " << ks << " ke = " << ke << " v2 = " << v2 <<  " v3 = " << v3 <<  " x y z = " << x << " " << y << " " << z << " " << " i j k = " << i << " " << j << " " << k << " " <<
-        //     " v1_neighbs " << prim(IVX,k+1,j,i) << " " << prim(IVX,k-1,j,i) << " " << prim(IVX,k,j+1,i) << " " << prim(IVX,k,j-1,i) << " " << prim(IVX,k,j,i+1) << " " << prim(IVX,k,j,i-1) << 
-        //     " v2_neighbs " << prim(IVY,k+1,j,i) << " " << prim(IVY,k-1,j,i) << " " << prim(IVY,k,j+1,i) << " " << prim(IVY,k,j-1,i) << " " << prim(IVY,k,j,i+1) << " " << prim(IVY,k,j,i-1) << 
-        //     " v3_neighbs " << prim(IVZ,k+1,j,i) << " " << prim(IVZ,k-1,j,i) << " " << prim(IVZ,k,j+1,i) << " " << prim(IVZ,k,j-1,i) << " " << prim(IVZ,k,j,i+1) << " " << prim(IVZ,k,j,i-1) << 
-        //     " rho_neighbs " << prim(IDN,k+1,j,i) << " " << prim(IDN,k-1,j,i) << " " << prim(IDN,k,j+1,i) << " " << prim(IDN,k,j-1,i) << " " << prim(IDN,k,j,i+1) << " " << prim(IDN,k,j,i-1) << 
-        //     " rho " << rho << " e " << e << " m1 " << m1 << " m2 " << m2 << " m3 " << m3 << " n_neighbs " << n_neighbs << "\n";
-        // }
-
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
-        Real u = e - kinetic;
+        Real u = e - kinetic; 
+        if (MAGNETIC_FIELDS_ENABLED) {
+          const Real &bcc1 = bcc(IB1,k,j,i);
+          const Real &bcc2 = bcc(IB2,k,j,i);
+          const Real &bcc3 = bcc(IB3,k,j,i);
+          Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
+          u -= magnetic; 
+        } 
         Real P = u * (gamma_adi-1.0);
 
         // calculate temperature in physical units before cooling
@@ -831,8 +782,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
                   m3 += (average_density + rho_ej) * v_ej * (z-z_SN[i_SN%300])/distance_to_SNe;
                   Real KE_final = 0.5 * ( SQR(m1)+SQR(m2)+SQR(m3) ) / rho; 
                   e += KE_final - KE_init; 
-                  delta_e += e;                  // delta_ke += KE_final;                  // delta_m += rho * vol_cell;
-                  // std::cout << " pmb->lid " << pmb->lid << " delta_e " << delta_e << " distance_to_SNe " << distance_to_SNe << " x " << x <<" y " << y << " z " << z << "\n";
+                  delta_e += e;          
                 }
               }
             }
