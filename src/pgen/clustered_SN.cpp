@@ -379,7 +379,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IPR,k,j,i) = cs2 * phydro->w(IDN,k,j,i); 
         } else {
           phydro->w(IDN,k,j,i) = rho_floor;
-          phydro->w(IPR,k,j,i) = rho_floor * (cs2 * (1.0 + std::log(rho_0/rho_floor)) - vc2o2r2*SQR(z));
+          phydro->w(IPR,k,j,i) = rho_floor * cs2 ; //(cs2 * (1.0 + std::log(rho_0/rho_floor)) - vc2o2r2*SQR(z));
         }
         phydro->w(IVX,k,j,i) = 0.0;
         phydro->w(IVY,k,j,i) = 0.0;
@@ -396,7 +396,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         for (int i=is; i<=ie+1; i++) {
           pfield->b.x1f(k,j,i) = 0.0;
           pfield->b.x2f(k,j,i) = 0.0;
-          pfield->b.x3f(k,j,i) = std::sqrt(2.0 * phydro->w(IPR,k,j,i)/beta);
+          pfield->b.x3f(k,j,i) = std::sqrt(2.0 * pgas_0/beta);
         }
       }
     }
