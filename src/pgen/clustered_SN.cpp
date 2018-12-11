@@ -409,11 +409,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       }
     }
     // Initialize conserved values
-    // peos->PrimitiveToConserved(phydro->w, pfield->b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+    peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   } else {
     // Initialize conserved values
-    // AthenaArray<Real> b;
-    // peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+    AthenaArray<Real> b;
+    peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   }
   return;
 }
