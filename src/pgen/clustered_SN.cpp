@@ -254,12 +254,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserHistoryOutput(1, CoolingLosses, "e_SN");
   EnrollUserHistoryOutput(2, CoolingLosses, "e_ceil");
 
-  EnrollUserHistoryOutput(3 , fluxes, "VolHot");
-  EnrollUserHistoryOutput(4 , fluxes, "EtotHot");
-  EnrollUserHistoryOutput(5 , fluxes, "EthHot");
-  EnrollUserHistoryOutput(6 , fluxes, "MHot");
-  EnrollUserHistoryOutput(7 , fluxes, "THot");
-  EnrollUserHistoryOutput(8 , fluxes, "rhoHot");
+  EnrollUserHistoryOutput(3 , fluxes, "Edt20");
+  EnrollUserHistoryOutput(4 , fluxes, "Mdt20");
+  EnrollUserHistoryOutput(5 , fluxes, "Edo20");
+  EnrollUserHistoryOutput(6 , fluxes, "Mdo20");
+  EnrollUserHistoryOutput(7 , fluxes, "Edt20c");
+  EnrollUserHistoryOutput(8 , fluxes, "Mdt20c");
   EnrollUserHistoryOutput(9 , fluxes, "Edo20c");
   EnrollUserHistoryOutput(10, fluxes, "Mdo20c");
   EnrollUserHistoryOutput(11, fluxes, "Edt20w");
@@ -459,7 +459,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   
   // zero out the fluxes
   if (pmb->lid == 0) {
-    // pmb->ruser_meshblock_data[1].NewAthenaArray(32); // is this supposed to be here???
+    pmb->ruser_meshblock_data[1].NewAthenaArray(32); // is this supposed to be here???
     for (int i = 0; i < 32; ++i) {
       pmb->ruser_meshblock_data[1](i) = 0.0; 
     }
@@ -471,10 +471,18 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   int js = pmb->js, je = pmb->je;
   int ks = pmb->ks, ke = pmb->ke;
 
-  Real my_v1max=0., my_v2max=0., my_v3max=0., my_Tmax=0.;
+  int i_flux_z,i_flux_T;
+  Real z_top = pmb->pmy_mesh->mesh_size.x3max;
 
   for (int k = ks; k <= ke; ++k) {
+    i_flux_z = -1;
     Real z = pmb->pcoord->x3v(k);
+    if ( ((std::abs(z) - 200.*pc/length_scale) > -1.0*pmb->pcoord->dx3v(k)) and ((std::abs(z) - 200.*pc/length_scale) <= 0.) ){
+      i_flux_z=0;
+    } 
+    if ( ((std::abs(z) - 540.*pc/length_scale) > -1.0*pmb->pcoord->dx3v(k)) and ((std::abs(z) - 540.*pc/length_scale) <= 0.) ){
+      i_flux_z=16;
+    } 
     for (int j = js; j <= je; ++j) {
       Real y = pmb->pcoord->x2v(j);
       for (int i = is; i <= ie; ++i) {
@@ -482,15 +490,95 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         // Extract primitive and conserved quantities
         const Real &rho_half = prim(IDN,k,j,i);
         const Real &pgas_half = prim(IPR,k,j,i);
-        const Real &rho = cons(IDN,k,j,i);
+        Real &rho = cons(IDN,k,j,i);
         Real &e = cons(IEN,k,j,i);
         Real &m1 = cons(IM1,k,j,i);
         Real &m2 = cons(IM2,k,j,i);
         Real &m3 = cons(IM3,k,j,i);
-        Real v1 = m1/rho;
-        Real v2 = m2/rho;
-        Real v3 = m3/rho;
+        const Real &v1 = prim(IVX,k,j,i);
+        const Real &v2 = prim(IVY,k,j,i);
+        const Real &v3 = prim(IVZ,k,j,i);
         Real dA = pmb->pcoord->dx1v(k)*pmb->pcoord->dx2v(k);
+
+        // if ((std::abs(v1) > v_max)||(std::abs(v2) > v_max)||(std::abs(v3) > v_max)){
+        //   Real n_neighbs=0.0;
+        //   Real rho_neighbs = 0.0;
+        //   Real e_neighbs = 0.0;
+        //   Real m1_neighbs = 0.0;
+        //   Real m2_neighbs = 0.0;
+        //   Real m3_neighbs = 0.0;
+        //   if ((k+1<=ke)&&(fabs(prim(IVX,k+1,j,i))<v_max)&&(fabs(prim(IVY,k+1,j,i))<v_max)&&(fabs(prim(IVZ,k+1,j,i))<v_max)){
+        //     n_neighbs += 1.0;
+        //     rho_neighbs += cons(IDN,k+1,j,i);
+        //     e_neighbs   += cons(IEN,k+1,j,i);
+        //     m1_neighbs  += cons(IM1,k+1,j,i);
+        //     m2_neighbs  += cons(IM2,k+1,j,i);
+        //     m3_neighbs  += cons(IM3,k+1,j,i);
+        //   }
+        //   if ((k-1>=ks)&&(fabs(prim(IVX,k-1,j,i))<v_max)&&(fabs(prim(IVY,k-1,j,i))<v_max)&&(fabs(prim(IVZ,k-1,j,i))<v_max)){
+        //     n_neighbs += 1.0;
+        //     rho_neighbs += cons(IDN,k-1,j,i);
+        //     e_neighbs   += cons(IEN,k-1,j,i);
+        //     m1_neighbs  += cons(IM1,k-1,j,i);
+        //     m2_neighbs  += cons(IM2,k-1,j,i);
+        //     m3_neighbs  += cons(IM3,k-1,j,i);
+        //   }
+        //   if ((j+1<=je)&&(fabs(prim(IVX,k,j+1,i))<v_max)&&(fabs(prim(IVY,k,j+1,i))<v_max)&&(fabs(prim(IVZ,k,j+1,i))<v_max)){
+        //     n_neighbs += 1.0;
+        //     rho_neighbs += cons(IDN,k,j+1,i);
+        //     e_neighbs   += cons(IEN,k,j+1,i);
+        //     m1_neighbs  += cons(IM1,k,j+1,i);
+        //     m2_neighbs  += cons(IM2,k,j+1,i);
+        //     m3_neighbs  += cons(IM3,k,j+1,i);
+        //   }
+        //   if ((j-1>=js)&&(fabs(prim(IVX,k,j-1,i))<v_max)&&(fabs(prim(IVY,k,j-1,i))<v_max)&&(fabs(prim(IVZ,k,j-1,i))<v_max)){
+        //     n_neighbs += 1.0;
+        //     rho_neighbs += cons(IDN,k,j-1,i);
+        //     e_neighbs   += cons(IEN,k,j-1,i);
+        //     m1_neighbs  += cons(IM1,k,j-1,i);
+        //     m2_neighbs  += cons(IM2,k,j-1,i);
+        //     m3_neighbs  += cons(IM3,k,j-1,i);
+        //   }
+        //   if ((i+1<=ie)&&(fabs(prim(IVX,k,j,i+1))<v_max)&&(fabs(prim(IVY,k,j,i+1))<v_max)&&(fabs(prim(IVZ,k,j,i+1))<v_max)){
+        //    n_neighbs += 1.0;
+        //     rho_neighbs += cons(IDN,k,j,i+1);
+        //     e_neighbs   += cons(IEN,k,j,i+1);
+        //     m1_neighbs  += cons(IM1,k,j,i+1);
+        //     m2_neighbs  += cons(IM2,k,j,i+1);
+        //     m3_neighbs  += cons(IM3,k,j,i+1);
+        //   }
+        //   if ((i-1>=is)&&(fabs(prim(IVX,k,j,i-1))<v_max)&&(fabs(prim(IVY,k,j,i-1))<v_max)&&(fabs(prim(IVZ,k,j,i-1))<v_max)){
+        //     n_neighbs += 1.0;
+        //     rho_neighbs += cons(IDN,k,j,i-1);
+        //     e_neighbs   += cons(IEN,k,j,i-1);
+        //     m1_neighbs  += cons(IM1,k,j,i-1);
+        //     m2_neighbs  += cons(IM2,k,j,i-1);
+        //     m3_neighbs  += cons(IM3,k,j,i-1);
+        //   }
+        //   if (n_neighbs>0.0){
+        //     rho_neighbs /= n_neighbs;
+        //     e_neighbs   /= n_neighbs;
+        //     m1_neighbs  /= n_neighbs;
+        //     m2_neighbs  /= n_neighbs;
+        //     m3_neighbs  /= n_neighbs;
+        //     rho = rho_neighbs;
+        //     e = e_neighbs;
+        //     m1 = m1_neighbs;
+        //     m2 = m2_neighbs;
+        //     m3 = m3_neighbs;
+        //   } else {
+        //     m1 = 0.0 ;
+        //     m2 = 0.0 ;
+        //     m3 = 0.0 ;
+        //     e  = pgas_half / (gamma_adi-1.0);
+        //   }
+        //   std::cout << " v > v_max, v1 = " << v1 << " ks = " << ks << " ke = " << ke << " v2 = " << v2 <<  " v3 = " << v3 <<  " x y z = " << x << " " << y << " " << z << " " << " i j k = " << i << " " << j << " " << k << " " <<
+        //     " v1_neighbs " << prim(IVX,k+1,j,i) << " " << prim(IVX,k-1,j,i) << " " << prim(IVX,k,j+1,i) << " " << prim(IVX,k,j-1,i) << " " << prim(IVX,k,j,i+1) << " " << prim(IVX,k,j,i-1) << 
+        //     " v2_neighbs " << prim(IVY,k+1,j,i) << " " << prim(IVY,k-1,j,i) << " " << prim(IVY,k,j+1,i) << " " << prim(IVY,k,j-1,i) << " " << prim(IVY,k,j,i+1) << " " << prim(IVY,k,j,i-1) << 
+        //     " v3_neighbs " << prim(IVZ,k+1,j,i) << " " << prim(IVZ,k-1,j,i) << " " << prim(IVZ,k,j+1,i) << " " << prim(IVZ,k,j-1,i) << " " << prim(IVZ,k,j,i+1) << " " << prim(IVZ,k,j,i-1) << 
+        //     " rho_neighbs " << prim(IDN,k+1,j,i) << " " << prim(IDN,k-1,j,i) << " " << prim(IDN,k,j+1,i) << " " << prim(IDN,k,j-1,i) << " " << prim(IDN,k,j,i+1) << " " << prim(IDN,k,j,i-1) << 
+        //     " rho " << rho << " e " << e << " m1 " << m1 << " m2 " << m2 << " m3 " << m3 << " n_neighbs " << n_neighbs << "\n";
+        // }
 
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
@@ -499,10 +587,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         // calculate temperature in physical units before cooling
         Real T_before = mu * mp * (P/rho)*(pgas_scale/rho_scale) / kb;
         Real nH = rho*rho_scale/(muH*mp);
-
-        // int n_subcycle = std::max(1,std::min(25, (int) (dt/(0.25*std::abs( tcool(T_before, nH) )/time_scale)) ));
-        // int n_subcycle = std::max(1,std::min(100, (int) (dt/(0.01*std::abs( tcool(T_before, nH) )/time_scale)) ));
-        // Real dt_cool = dt*time_scale/n_subcycle;
 
         int n_subcycle = (int) ceil(dt / (0.1 * std::abs(tcool(T_before,nH))/time_scale) );
         n_subcycle = std::min(100, n_subcycle);
@@ -521,42 +605,12 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         
         Real u_after = (kb*std::max(T_update,T_floor) / (mu * mp) * rho * (rho_scale/pgas_scale))/(gamma_adi-1.0);
 
-        if (dt < dt_cutoff){
-          my_Tmax = std::max(my_Tmax, T_update);
-          my_v1max = std::max(my_v1max, std::abs(v1));
-          my_v2max = std::max(my_v2max, std::abs(v2));
-          my_v3max = std::max(my_v3max, std::abs(v3));
-        }
-
         Real delta_e_ceil = 0.0;
         if (T_update > T_max){
           delta_e_ceil -= u_after;
           u_after = (kb*std::min(T_update,T_max) / (mu * mp) * rho * (rho_scale/pgas_scale))/(gamma_adi-1.0);
           delta_e_ceil += u_after;
-          T_update = T_max;
           // std::cout << " T_update > T_max, T_update = " << T_update << " delta_e_ceil = " << delta_e_ceil << "\n";
-        }
-
-        if (v1 > v_max){
-          e -= kinetic;
-          kinetic -= SQR(m1)/(2.0*rho);
-          m1 = v_max*rho;
-          kinetic += SQR(m1)/(2.0*rho);
-          e += kinetic;
-        }
-        if (v2 > v_max){
-          e -= kinetic;
-          kinetic -= SQR(m2)/(2.0*rho);
-          m2 = v_max*rho;
-          kinetic += SQR(m2)/(2.0*rho);
-          e += kinetic;
-        }
-        if (v3 > v_max){
-          e -= kinetic;
-          kinetic -= SQR(m3)/(2.0*rho);
-          m3 = v_max*rho;
-          kinetic += SQR(m3)/(2.0*rho);
-          e += kinetic;
         }
 
         Real delta_e = u_after - u;
@@ -565,14 +619,30 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           e += delta_e;  
         }
 
+        if ((i_flux_z >= 0) and (not predict_step)){  
+          Real Mdot = z < 0.0 ? -1*rho*dA*v3 : rho*dA*v3 ;
+          Real Edot = Mdot*( 0.5*(SQR(v1)+SQR(v2)+SQR(v3)) + 2.5*P/rho - vc2o2r2*(SQR(z_top)-SQR(z))); 
+          Real T = std::min(T_max,std::max(T_update,T_floor));
+          
+          i_flux_T = 0;
+          if (T < 1.0e4){
+            i_flux_T = 4;
+          } else if (T < 1.0e6){
+            i_flux_T = 8;
+          } else {
+            i_flux_T = 12;
+          }
 
-        if (T_update>1e5){
-          pmb->ruser_meshblock_data[1](0) += pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i);
-          pmb->ruser_meshblock_data[1](1) += e * (pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i));
-          pmb->ruser_meshblock_data[1](2) += (e - kinetic)* (pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i));
-          pmb->ruser_meshblock_data[1](3) += rho * (pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i));
-          pmb->ruser_meshblock_data[1](4) += T_update;
-          pmb->ruser_meshblock_data[1](5) += rho;
+          pmb->ruser_meshblock_data[1](i_flux_T+i_flux_z)   += Edot;
+          pmb->ruser_meshblock_data[1](i_flux_T+i_flux_z+1) += Mdot;
+          pmb->ruser_meshblock_data[1](i_flux_z)   += Edot;
+          pmb->ruser_meshblock_data[1](i_flux_z+1) += Mdot;
+          if (z*v3 > 0){
+            pmb->ruser_meshblock_data[1](i_flux_T+i_flux_z+2) += Edot;
+            pmb->ruser_meshblock_data[1](i_flux_T+i_flux_z+3) += Mdot;
+            pmb->ruser_meshblock_data[1](i_flux_z+2) += Edot;
+            pmb->ruser_meshblock_data[1](i_flux_z+3) += Mdot;
+          } 
         }
 
         edot(k,j,i) = delta_e / dt;
@@ -583,20 +653,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         }
       }
     }
-  }
-
-  if (dt < dt_cutoff){
-    Real all_v1max, all_v2max, all_v3max, all_Tmax;
-    Real aggregates_my[4];
-    aggregates_my[0] = my_v1max;
-    aggregates_my[1] = my_v2max;
-    aggregates_my[2] = my_v3max;
-    aggregates_my[3] = my_Tmax;
-    Real aggregates_all[4];
-
-    MPI_Allreduce(aggregates_my, aggregates_all, 4, MPI_ATHENA_REAL, MPI_MAX,
-            MPI_COMM_WORLD);
-    if(Globals::my_rank==0) std::cout << " all_Tmax " << aggregates_all[3]<< " cs " << sqrt(kb*aggregates_all[3]/mp/0.62)/vel_scale << " all_v1max " << aggregates_all[0] << " all_v2max " << aggregates_all[1] << " all_v3max " << aggregates_all[2] << "\n";
   }
 
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
