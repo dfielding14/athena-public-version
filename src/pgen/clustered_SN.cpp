@@ -332,7 +332,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 
   // Set output variables
   AllocateUserOutputVariables(1);
-  // SetUserOutputVariableName(0, "edot");
+  SetUserOutputVariableName(0, "edot_cool");
   return;
 }
 
@@ -429,18 +429,20 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 Real cooling_timestep(MeshBlock *pmb)
 {
   Real min_dt=1.0e10;
-  for (int k=pmb->ks; k<=pmb->ke; ++k) {
-    for (int j=pmb->js; j<=pmb->je; ++j) {
-      for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real &P = pmb->phydro->w(IPR,k,j,i);
-        Real &rho = pmb->phydro->w(IDN,k,j,i);
+  if (t >= t_start_cooling) {
+    for (int k=pmb->ks; k<=pmb->ke; ++k) {
+      for (int j=pmb->js; j<=pmb->je; ++j) {
+        for (int i=pmb->is; i<=pmb->ie; ++i) {
+          Real &P = pmb->phydro->w(IPR,k,j,i);
+          Real &rho = pmb->phydro->w(IDN,k,j,i);
 
-        Real T_before = mu * mp * (P/rho)*(pgas_scale/rho_scale) / kb;
-        Real nH = rho*rho_scale/(muH*mp);
-        if (T_before > 1.01 * T_floor){
-          min_dt = std::min(min_dt, 0.25 * std::abs(tcool(T_before,nH))/time_scale );
+          Real T_before = mu * mp * (P/rho)*(pgas_scale/rho_scale) / kb;
+          Real nH = rho*rho_scale/(muH*mp);
+          if (T_before > 1.01 * T_floor){
+            min_dt = std::min(min_dt, 0.25 * std::abs(tcool(T_before,nH))/time_scale );
+          }
+          min_dt = std::max(dt_cutoff,min_dt);
         }
-        min_dt = std::max(dt_cutoff,min_dt);
       }
     }
   }
