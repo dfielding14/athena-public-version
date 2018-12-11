@@ -361,7 +361,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   }
   Real cs2 = pgas_0/rho_0;
   if(Globals::my_rank==0) {
-        std::cout << " NGHOST " << NGHOST << "\n";
+        std::cout << " vc2o2r2 " << vc2o2r2 << "\n";
+        std::cout << " cs2 " << cs2 << "\n";
+        std::cout << " rho_0 " << rho_0 << "\n";
+        std::cout << " rho_floor " << rho_floor << "\n";
   }
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
