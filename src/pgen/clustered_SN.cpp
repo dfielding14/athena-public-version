@@ -570,7 +570,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           e += delta_e;  
         }
 
-        if ((i_flux_z >= 0) and (not predict_step)){  
+        if ((i_flux_z >= 0) and (not predict_step) and (vc2o2r2 > 0.)){  
           Real Mdot = z < 0.0 ? -1*rho*dA*v3 : rho*dA*v3 ;
           Real Edot = Mdot*( 0.5*(SQR(v1)+SQR(v2)+SQR(v3)) + 2.5*P/rho - vc2o2r2*(SQR(z_top)-SQR(z))); 
           Real T = std::min(T_max,std::max(T_update,T_floor));
@@ -595,6 +595,16 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             pmb->ruser_meshblock_data[1](i_flux_z+3) += Mdot;
           } 
         }
+
+        if ((vc2o2r2 <= 0.) and (T_update>1e5)){
+          pmb->ruser_meshblock_data[1](0) += pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i);
+          pmb->ruser_meshblock_data[1](1) += e * (pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i));
+          pmb->ruser_meshblock_data[1](2) += (e - kinetic)* (pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i));
+          pmb->ruser_meshblock_data[1](3) += rho * (pmb->pcoord->dx3v(k)*pmb->pcoord->dx2v(j)*pmb->pcoord->dx1v(i));
+          pmb->ruser_meshblock_data[1](4) += T_update;
+          pmb->ruser_meshblock_data[1](5) += rho;
+        }
+
 
         edot(k,j,i) = delta_e / dt;
 
