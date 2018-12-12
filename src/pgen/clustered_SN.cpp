@@ -224,11 +224,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // initialize the SN counter to 0
   i_SN = 0; 
   dt_SN = t_SNe/N_SNe;
-  t_last_SN = -dt_SN;
+  t_last_SN = t_start_SN-dt_SN;
 
   if(Globals::my_rank==0) {
     std::cout << "dt_SN in code units " << dt_SN << "\n";
     std::cout << "t_SNe in code units " << t_SNe << "\n";
+    std::cout << "t_last_SN in code units " << t_last_SN << "\n";
   }
 
   //------------------------------------------------------------------------------------------//
@@ -636,6 +637,9 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
 //_______________ SN INJ. source term last _______________//
   if ((t - t_last_SN > dt_SN) and (t>=t_start_SN) and (not predict_step)) {
+    if(Globals::my_rank==0) {
+      std::cout << " Time to blow! \n ";
+    }
     Real N_cells         = 0.0;
     Real average_density = 0.0;
     Real total_m         = 0.0;
