@@ -25,7 +25,7 @@
 
 // Declarations
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
-    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons);
+    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage);
 Real CoolingLosses(MeshBlock *pmb, int iout);
 Real fluxes(MeshBlock *pmb, int iout);
 static void FindIndex(const AthenaArray<double> &array, Real value, int *p_index,
@@ -651,7 +651,7 @@ Real cooling_timestep(MeshBlock *pmb)
 //     3: edot_cond
 
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
-    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
+    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
 {
   // Prepare values to aggregate
   // cooling
@@ -682,9 +682,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
   temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
   
-  // Determine which part of step this is
-  bool predict_step = prim.data() == pmb->phydro->w.data();
-
   Real phi_ta = grav_pot(r_outer);
 
   // Calculate cooling on all blocks
@@ -705,7 +702,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
       // Extract arrays
       AthenaArray<Real> prim_local, cons_local, user_out_var_local;
-      if (predict_step) {
+      if (stage == 1) {
         prim_local.InitWithShallowCopy(pblock->phydro->w);
         cons_local.InitWithShallowCopy(pblock->phydro->u1);
       } else {
@@ -901,7 +898,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         if (t > t_cool_start){
           e += delta_e;
         }
-        if (not predict_step) {
+        if (stage == 2) {
           delta_e_block += delta_e;
         }
 
@@ -915,7 +912,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         if (u > u_max) {
           e = kinetic + u_max;
           if (MAGNETIC_FIELDS_ENABLED) e += magnetic;
-          if (not predict_step) {
+          if (stage == 2) {
             Real vol_cell = pmb->pcoord->GetCellVolume(k,j,i);
             delta_e_ceil += (u - u_max);
           }

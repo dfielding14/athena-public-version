@@ -29,7 +29,7 @@
 
 // Declarations
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
-    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons);
+    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage);
 Real CoolingLosses(MeshBlock *pmb, int iout);
 static void FindIndex(const AthenaArray<double> &array, Real value, int *p_index,
     Real *p_fraction);
@@ -469,7 +469,7 @@ Real cooling_timestep(MeshBlock *pmb)
 //     1: T
 
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
-    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
+    const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
 {
   // Prepare values to aggregate
   // cooling
@@ -485,9 +485,6 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
   pgas_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[1]);
   edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
   temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
-  
-  // Determine which part of step this is
-  bool predict_step = prim.data() == pmb->phydro->w.data();
 
   // Calculate cooling on all blocks
   if (pmb->lid == 0) {
@@ -507,7 +504,7 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
 
       // Extract arrays
       AthenaArray<Real> prim_local, cons_local, user_out_var_local;
-      if (predict_step) {
+      if (stage == 1) {
         prim_local.InitWithShallowCopy(pblock->phydro->w);
         cons_local.InitWithShallowCopy(pblock->phydro->u1);
       } else {
@@ -614,7 +611,7 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
         if (t > t_cool_start){
           e += delta_e;
         }
-        if (not predict_step) {
+        if (stage == 2) {
           delta_e_block += delta_e;
         }
 
@@ -624,7 +621,7 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
         u = e - kinetic;
         if (u > u_max) {
           e = kinetic + u_max;
-          if (not predict_step) {
+          if (stage == 2) {
             delta_e_ceil += (u - u_max) * vol_cell;
           }
         }

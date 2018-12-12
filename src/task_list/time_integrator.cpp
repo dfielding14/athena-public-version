@@ -627,7 +627,7 @@ enum TaskStatus TimeIntegratorTaskList::HydroSourceTerms(MeshBlock *pmb, int sta
     Real t_start_stage = pmb->pmy_mesh->time + pmb->stage_abscissae[stage-1][0];
     // Scaled coefficient for RHS update
     Real dt = (stage_wghts[(stage-1)].beta)*(pmb->pmy_mesh->dt);
-    ph->psrc->AddHydroSourceTerms(t_start_stage, dt, ph->flux, ph->w, pf->bcc, ph->u);
+    ph->psrc->AddHydroSourceTerms(t_start_stage, dt, ph->flux, ph->w, pf->bcc, ph->u, stage);
   } else {
     // Evaluate the source terms at the beginning of the
     return TASK_FAIL;

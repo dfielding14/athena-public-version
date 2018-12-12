@@ -55,7 +55,7 @@ Real fluxes(MeshBlock *pmb, int iout);
 
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, 
-    AthenaArray<Real> &cons);
+    AthenaArray<Real> &cons, int stage);
 int RefinementCondition(MeshBlock *pmb);
 
 // Global variables --- cooling
@@ -465,7 +465,7 @@ Real cooling_timestep(MeshBlock *pmb)
 
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, 
-    AthenaArray<Real> &cons)
+    AthenaArray<Real> &cons, int stage)
 {
 
 //_______________ GRAVITY source term first _______________//
@@ -484,9 +484,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
 //_______________ COOLING source term next _______________//
   Real vol_cell = pmb->pcoord->dx1f(0)*pmb->pcoord->dx2f(0)*pmb->pcoord->dx3f(0);
-
-  // Determine which part of step this is
-  bool predict_step = prim.data() == pmb->phydro->w.data();
 
   AthenaArray<Real> edot;
   edot.InitWithShallowSlice(pmb->user_out_var, 4, 0, 1);
@@ -583,7 +580,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           e += delta_e;  
         }
 
-        if ((i_flux_z >= 0) and (not predict_step) and (vc2o2r2 > 0.)){  
+        if ((i_flux_z >= 0) and (stage == 2) and (vc2o2r2 > 0.)){  
           Real Mdot = z < 0.0 ? -1*rho*dA*v3 : rho*dA*v3 ;
           Real Edot = Mdot*( 0.5*(SQR(v1)+SQR(v2)+SQR(v3)) + 2.5*P/rho - vc2o2r2*(SQR(z_top)-SQR(z))); 
           Real T = std::min(T_max,std::max(T_update,T_floor));
@@ -621,7 +618,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
         edot(k,j,i) = delta_e / dt;
 
-        if (not predict_step) {
+        if (stage == 2) {
           delta_e_block += delta_e;
           delta_e_ceil_block += delta_e_ceil;
         }
@@ -636,8 +633,8 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   edot.DeleteAthenaArray();
 
 //_______________ SN INJ. source term last _______________//
-  // if ((t - t_last_SN > dt_SN) and (t>=t_start_SN) and (not predict_step)) {
-  if ((t - t_last_SN > dt_SN) and (t>=t_start_SN)) {
+  if ((t - t_last_SN > dt_SN) and (t>=t_start_SN) and (stage == 2)) {
+  // if ((t - t_last_SN > dt_SN) and (t>=t_start_SN)) {
     if(Globals::my_rank==0) {
       std::cout << " Time to blow! \n ";
     }
