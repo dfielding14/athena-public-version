@@ -636,7 +636,8 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   edot.DeleteAthenaArray();
 
 //_______________ SN INJ. source term last _______________//
-  if ((t - t_last_SN > dt_SN) and (t>=t_start_SN) and (not predict_step)) {
+  // if ((t - t_last_SN > dt_SN) and (t>=t_start_SN) and (not predict_step)) {
+  if ((t - t_last_SN > dt_SN) and (t>=t_start_SN)) {
     if(Globals::my_rank==0) {
       std::cout << " Time to blow! \n ";
     }
