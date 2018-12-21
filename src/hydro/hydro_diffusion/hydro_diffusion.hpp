@@ -23,7 +23,10 @@ class HydroDiffusion;
 void ConstViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &w,
     const AthenaArray<Real> &bc, int is, int ie, int js, int je, int ks, int ke);
 
-void  ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &w,
+void ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &w,
+    const AthenaArray<Real> &bc, int is, int ie, int js, int je, int ks, int ke);
+
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &w,
     const AthenaArray<Real> &bc, int is, int ie, int js, int je, int ks, int ke);
 
 
@@ -44,6 +47,7 @@ public:
   AthenaArray<Real> nu; // viscosity array
 
   Real kappa_iso, kappa_aniso; // thermal conduction coeff
+  Real kappa_sat; // thermal conduction saturation coeff
   AthenaArray<Real> cndflx[3]; // thermal stress tensor
   AthenaArray<Real> kappa; // conduction array
 

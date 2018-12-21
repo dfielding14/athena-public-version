@@ -25,6 +25,7 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
   int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
   int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
   Real kappaf, denf, dTdx, dTdy, dTdz;
+  Real flux1, flux2, flux3;
 
   // i-direction
   jl=js, ju=je, kl=ks, ku=ke;
@@ -44,7 +45,15 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
         denf = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j,i-1));
         dTdx = (prim(IPR,k,j,i)/prim(IDN,k,j,i) - prim(IPR,k,j,i-1)/
                 prim(IDN,k,j,i-1))/pco_->dx1v(i-1);
-        x1flux(k,j,i) -= kappaf*denf*dTdx;
+        flux1 = kappaf*denf*dTdx;
+        /// CAN I DO THIS WITHOUT AN IF??
+        if (kappa_sat > 0.0){
+          Real flux_sat = kappa_sat * sqrt(pow(prim(IPR,k,j,i),3)/prim(IDN,k,j,i));
+          x1flux(k,j,i) -= flux1 / (1 + std::abs(flux1)/flux_sat);
+        } else {
+          x1flux(k,j,i) -= flux1
+        }
+        kappaf*denf*dTdx;
       }
     }
   }
@@ -111,7 +120,7 @@ void HydroDiffusion::ThermalFlux_aniso(const AthenaArray<Real> &p,
 
 
 //----------------------------------------------------------------------------------------
-// constant viscosity
+// constant conduction
 
 void ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
      const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
@@ -121,6 +130,34 @@ void ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Re
 #pragma omp simd
         for (int i=is; i<=ie; ++i)
           phdif->kappa(ISO,k,j,i) = phdif->kappa_iso;
+      }
+    }
+  }
+  if (phdif->kappa_aniso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i)
+          phdif->kappa(ANI,k,j,i) = phdif->kappa_aniso;
+      }
+    }
+  }
+  return;
+}
+
+
+
+//----------------------------------------------------------------------------------------
+// Spitzer conduction
+
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
+  if (phdif->kappa_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i)
+          phdif->kappa(ISO,k,j,i) = phdif->kappa_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
       }
     }
   }
