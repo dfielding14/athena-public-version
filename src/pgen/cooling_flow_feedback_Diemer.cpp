@@ -65,13 +65,13 @@ static Real cs, rho_ta, f_cs;
 static Real r_inner, r_outer;
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh, int ngh);
 void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh, int ngh);
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh, int ngh);
 void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke);
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh, int ngh);
 
 // static Real dt_drive; // the duration of driving
 // static Real deltat_drive; // the spacing between driving windows
@@ -1117,11 +1117,11 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
 //----------------------------------------------------------------------------------------
 //! \fn void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke)
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
 //  \brief Wind boundary conditions with no inflow, inner x1 boundary
 
 void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke)
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
   Real vc_ta  = sqrt( grav_accel(r_outer) * r_outer );
   for (int k=ks; k<=ke; ++k) {
@@ -1151,12 +1151,12 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //----------------------------------------------------------------------------------------
 //! \fn void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke)
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
 //
 //  \brief extrapolate into ghost zones outer x1 boundary using second order derivative
 
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke)
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
   // extrapolate hydro variables into ghost zones
   for (int n=0; n<(NHYDRO); ++n) {
@@ -1211,12 +1211,12 @@ void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //----------------------------------------------------------------------------------------
 //! \fn void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke)
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
 //
 //  \brief extrapolate into ghost zones Inner x1 boundary using second order derivative
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke)
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
   // extrapolate hydro variables into ghost zones
   for (int n=0; n<(NHYDRO); ++n) {
@@ -1287,11 +1287,11 @@ void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //----------------------------------------------------------------------------------------
 //! \fn void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke)
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
 //  \brief Wind boundary conditions with no inflow, inner x1 boundary
 
 void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke)
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
   Real rho_out, area;
   area = SQR(pmb->pmy_mesh->mesh_size.x1min)
