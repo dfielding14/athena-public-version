@@ -46,3 +46,6 @@ meshtest.dat
 # editor temp files
 *~
 *.swp
+
+# local storage
+Old_athena++/
