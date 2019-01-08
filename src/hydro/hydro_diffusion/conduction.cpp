@@ -49,9 +49,9 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
         /// CAN I DO THIS WITHOUT AN IF??
         if (kappa_sat > 0.0){
           Real flux_sat = kappa_sat * sqrt(pow(prim(IPR,k,j,i),3)/prim(IDN,k,j,i));
-          x1flux(k,j,i) -= flux1 / (1 + std::abs(flux1)/flux_sat);
+          x1flux(k,j,i) -= flux1 / (1 + abs(flux1)/flux_sat);
         } else {
-          x1flux(k,j,i) -= flux1
+          x1flux(k,j,i) -= flux1;
         }
         kappaf*denf*dTdx;
       }
