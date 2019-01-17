@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if (pmesh->turb_flag > 1) pmesh->ptrbd->Driving(); // driven turbulence
+    if ((turb_flag == 2) || (turb_flag == 3)) pmesh->ptrbd->Driving(); // driven turbulence
 
     for (int stage=1; stage<=ptlist->nstages; ++stage) {
       if (SELF_GRAVITY_ENABLED == 1) // fft (flag 0 for discrete kernel, 1 for continuous)
