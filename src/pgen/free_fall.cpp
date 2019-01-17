@@ -61,6 +61,7 @@ static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs;
+static Real Mdot_init, Mdot_final, Mdot_timescale, v_out, cs_out;
 
 static Real r_inner, r_outer;
 
@@ -71,6 +72,8 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void VariableMdotOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 
 // static Real dt_drive; // the duration of driving
@@ -190,6 +193,18 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   Real x_outer = r_outer/rvir; 
 
+  Mdot_timescale   = pin->GetReal("problem", "Mdot_timescale")*1e9*yr; // in Gyr
+  Mdot_timescale  /= time_scale;
+  Mdot_init        = pin->GetReal("problem", "Mdot_init")*Msun/yr; // in Msun/yr
+  Mdot_init       /= (rho_scale * pow(length_scale,3) / time_scale);
+  Mdot_final       = pin->GetReal("problem", "Mdot_final")*Msun/yr; // in Msun/yr
+  Mdot_final      /= (rho_scale * pow(length_scale,3) / time_scale);
+  v_out            = pin->GetReal("problem", "v_out")*1e5; // in km/s
+  v_out           /= (length_scale/time_scale);
+  cs_out            = pin->GetReal("problem", "cs_out")*1e5; // in km/s
+  cs_out           /= (length_scale/time_scale);
+
+
   if(Globals::my_rank==0) {
     std::cout << " Mhalo = " << Mhalo << "\n";
     std::cout << " Mgal = " << Mgal << "\n";
@@ -211,6 +226,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     std::cout << " n_ta = " << rho_ta * rho_scale/0.62/mp << "\n";
     std::cout << " vc_ta = " << sqrt(grav_accel(r_outer) * r_outer )*length_scale/time_scale / 1e5 << "\n";
     std::cout << " P_ta = " << rho_ta * rho_scale/kb * f_cs * (grav_accel(r_outer) * r_outer )*SQR(length_scale/time_scale) << "\n";
+    std::cout << " Mdot_timescale = " << Mdot_timescale << "\n";
+    std::cout << " Mdot_init = " << Mdot_init << "\n";
+    std::cout << " Mdot_final = " << Mdot_final << "\n";
+    std::cout << " v_out = " << v_out << "\n";
+    std::cout << " cs_out = " << cs_out << "\n";
     std::cout << " dt_cutoff = " << dt_cutoff << "\n";
   }
 
@@ -478,7 +498,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Enroll no inflow boundary condition but only if it is turned on
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(OUTER_X1, ConstantOuterX1);
+    EnrollUserBoundaryFunction(OUTER_X1, VariableMdotOuterX1);
   }
   if(mesh_bcs[INNER_X1] == GetBoundaryFlag("user")) {
     if (eta > 0.){
@@ -550,13 +570,18 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for (int j = jl; j <= ju; ++j) {
       for (int i = il; i <= iu; ++i) {
         Real r = pcoord->x1v(i);
-        Real rho, press;
-        Real vc = sqrt(grav_accel(r) * r );
-        rho     = rho_ta * SQR(vc_ta/vc) * pow(r/r_outer,-1./f_cs);
-        press   = f_cs * SQR(vc) * rho; 
+        Real v_esc2 = 0.0;
+        for (int l = 1; l<=1000; ++l){
+          v_esc2 += grav_accel(r+(r_outer-r)/1000.);
+        }
+        v_esc2 += 0.5 * (grav_accel(r) + grav_accel(r_outer));
+        v_esc2 *= (r_outer - r)/1000.;
+        Real rho, v;
+        v = sqrt( v_out*v_out + v_esc2);
+        rho     = Mdot_init/(4*PI*r*r*v);
         phydro->w(IDN,k,j,i) = rho;
-        phydro->w(IPR,k,j,i) = press;
-        phydro->w(IVX,k,j,i) = 0.0;
+        phydro->w(IPR,k,j,i) = cs_out*cs_out*rho;
+        phydro->w(IVX,k,j,i) = -1.0*v;
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = 0.0;
 // Configuration checking
@@ -1132,6 +1157,42 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         prim(IVY,k,j,ie+i) = 0.0;
         prim(IVZ,k,j,ie+i) = 0.0;
         prim(IPR,k,j,ie+i) = rho_ta*f_cs*SQR(vc_ta);
+#if MAGNETIC_FIELDS_ENABLED
+        b.x1f(k,j,ie+i) = 0.0;
+        b.x2f(k,j,ie+i) = 0.0;
+        b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+#endif
+      }
+    }
+  }
+  return;
+}
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void VariableMdotOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief Wind boundary conditions with no inflow, inner x1 boundary
+
+void VariableMdotOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  Real vc_ta  = sqrt( grav_accel(r_outer) * r_outer );
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=1; i<=(NGHOST); ++i) {
+        Real r = pcoord->x1v(i);
+        Real rho, Mdot;
+        Mdot = (Mdot_init-Mdot_final)*(t/Mdot_timescale);
+        rho = Mdot / (4 * PI * r*r * v_out);
+        prim(IDN,k,j,ie+i) = rho;
+        prim(IVX,k,j,ie+i) = -v_out;
+        prim(IVY,k,j,ie+i) = 0.0;
+        prim(IVZ,k,j,ie+i) = 0.0;
+        prim(IPR,k,j,ie+i) = rho*cs_out*cs_out;
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
