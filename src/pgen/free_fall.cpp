@@ -1241,7 +1241,6 @@ void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   if (MAGNETIC_FIELDS_ENABLED) {
     for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-#pragma simd
       for (int i=1; i<=(NGHOST); ++i) {
         b.x1f(k,j,(ie+i+1)) = b.x1f(k,j,(ie+1));
       }
@@ -1249,7 +1248,6 @@ void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
     for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je+1; ++j) {
-#pragma simd
       for (int i=1; i<=(NGHOST); ++i) {
         b.x2f(k,j,(ie+i)) = b.x2f(k,j,ie);
       }
@@ -1257,7 +1255,6 @@ void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
     for (int k=ks; k<=ke+1; ++k) {
     for (int j=js; j<=je; ++j) {
-#pragma simd
       for (int i=1; i<=(NGHOST); ++i) {
         b.x3f(k,j,(ie+i)) = b.x3f(k,j,ie);
       }
@@ -1317,7 +1314,6 @@ void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   if (MAGNETIC_FIELDS_ENABLED) {
     for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-#pragma simd
       for (int i=1; i<=(NGHOST); ++i) {
         b.x1f(k,j,(is-i)) = b.x1f(k,j,is);
       }
@@ -1325,7 +1321,6 @@ void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
     for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je+1; ++j) {
-#pragma simd
       for (int i=1; i<=(NGHOST); ++i) {
         b.x2f(k,j,(is-i)) = b.x2f(k,j,is);
       }
@@ -1333,7 +1328,6 @@ void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
     for (int k=ks; k<=ke+1; ++k) {
     for (int j=js; j<=je; ++j) {
-#pragma simd
       for (int i=1; i<=(NGHOST); ++i) {
         b.x3f(k,j,(is-i)) = b.x3f(k,j,is);
       }
