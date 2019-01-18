@@ -572,7 +572,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real r = pcoord->x1v(i);
         Real v_esc2 = 0.0;
         for (int l = 1; l<=1000; ++l){
-          v_esc2 += grav_accel(r+(r_outer-r)/1000.);
+          v_esc2 += grav_accel(r+l*(r_outer-r)/1000.);
         }
         v_esc2 += 0.5 * (grav_accel(r) + grav_accel(r_outer));
         v_esc2 *= (r_outer - r)/1000.;
