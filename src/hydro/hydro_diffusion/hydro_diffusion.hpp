@@ -26,10 +26,6 @@ void ConstViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Rea
 void ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &w,
     const AthenaArray<Real> &bc, int is, int ie, int js, int je, int ks, int ke);
 
-void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &w,
-    const AthenaArray<Real> &bc, int is, int ie, int js, int je, int ks, int ke);
-
-
 enum {ISO=0, ANI=1};
 
 //! \class HydroDiffusion

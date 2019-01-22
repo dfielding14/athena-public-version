@@ -72,7 +72,7 @@ HydroDiffusion::HydroDiffusion(Hydro *phyd, ParameterInput *pin) {
 
       kappa.NewAthenaArray(2,ncells3,ncells2,ncells1);
       if(pmb_->pmy_mesh->ConductionCoeff_==NULL)
-        CalcCondCoeff_ = SpitzerConduction; // ConstConduction; DF --- should write my own EnrollConductionFunction or something
+        CalcCondCoeff_ = ConstConduction;
       else
         CalcCondCoeff_ = pmb_->pmy_mesh->ConductionCoeff_;
     }

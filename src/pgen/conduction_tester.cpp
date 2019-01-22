@@ -37,6 +37,19 @@ static Real Interpolate2D(const AthenaArray<double> &table, int j, int i, Real g
 static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i, Real h,
     Real g, Real f);
 
+void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+
 // Global variables
 static const Real mu_m_h = 1.008 * 1.660539040e-24;
 static Real gamma_adi;
@@ -429,6 +442,8 @@ Real cooling_timestep(MeshBlock *pmb)
 {
   if (pmb->pmy_mesh->time == 0.0){
     return 1.0e-6;
+  } else if (t < t_cool_start){
+    return HUGE_NUMBER;
   } else {
     Real min_dt=1.0e10;
     AthenaArray<Real> edot_cool, temperature;
@@ -641,6 +656,160 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
 
   return;
 }
+
+
+
+
+//----------------------------------------------------------------------------------------
+// Spitzer conduction with saturation 
+
+void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
+  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
+  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
+  Real kappa_ijk, kappa_im1, kappa_jm1, kappa_km1;
+  Real kappaf_i, denf_i; // , pressf_i
+  Reak kappaf_j, denf_j; // , pressf_j
+  Real kappaf_k, denf_k; // , pressf_k
+  Real dTdx, dTdy, dTdz;
+  Real flux1, flux2, flux3, flux; 
+  Real flux_sat; // Should there be one for each of the faces?
+
+  if (phdif->kappa_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i){
+          kappa_ijk = phdif->kappa_iso / prim(IDN,k,j,i)   * pow( prim(IPR,k,j,i)  /prim(IDN,k,j,i)   ,2.5);
+          kappa_im1 = phdif->kappa_iso / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
+          kappa_jm1 = phdif->kappa_iso / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
+          kappa_km1 = phdif->kappa_iso / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
+          kappaf_i = 0.5*(kappa_ijk - kappa_im1)
+          kappaf_j = 0.5*(kappa_ijk - kappa_jm1)
+          kappaf_k = 0.5*(kappa_ijk - kappa_km1)
+          denf_i = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j,i-1));
+          denf_j = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j-1,i));
+          denf_k = 0.5*(prim(IDN,k,j,i)+prim(IDN,k-1,j,i));
+          dTdx = (prim(IPR,k,j,i)/prim(IDN,k,j,i) - prim(IPR,k,j,i-1)/
+                  prim(IDN,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+          dTdy = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k,j-1,i)/
+                    prim(IDN,k,j-1,i))/pmb->pcoord->h2v(i)/pmb->pcoord->dx2v(j-1);
+          dTdz = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k-1,j,i)/
+                   prim(IDN,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+          flux1 = kappaf_i*denf_i*dTdx;
+          flux2 = kappaf_j*denf_j*dTdy;
+          flux3 = kappaf_k*denf_k*dTdz;
+          flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3))
+          flux_sat = kappa_sat * sqrt(pow(prim(IPR,k,j,i),3)/prim(IDN,k,j,i));
+          flux /= (1.0 + abs(flux)/flux_sat);
+          phdif->kappa(ISO,k,j,i) = flux / sqrt( SQR(denf_i * dTdx) + SQR(denf_j * dTdy) + SQR(denf_k * dTdz) );
+        }
+      }
+    }
+  }
+  return;
+}
+
+
+//----------------------------------------------------------------------------------------
+// Spitzer conduction  
+
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
+  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
+  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
+
+  if (phdif->kappa_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i){
+          phdif->kappa(ISO,k,j,i) = phdif->kappa_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
+        }
+      }
+    }
+  }
+  return;
+}
+
+
+
+
+
+//----------------------------------------------------------------------------------------
+// Spitzer Viscosity with saturation 
+
+void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
+  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
+  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
+  Real nu_ijk, nu_im1, nu_jm1, nu_km1;
+  Real nuf_i, denf_i; // , pressf_i
+  Reak nuf_j, denf_j; // , pressf_j
+  Real nuf_k, denf_k; // , pressf_k
+  Real dTdx, dTdy, dTdz;
+  Real flux1, flux2, flux3, flux; 
+  Real flux_sat; // Should there be one for each of the faces?
+
+  if (phdif->nu_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i){
+          nu_ijk = phdif->nu_iso / prim(IDN,k,j,i)   * pow( prim(IPR,k,j,i)  /prim(IDN,k,j,i)   ,2.5);
+          nu_im1 = phdif->nu_iso / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
+          nu_jm1 = phdif->nu_iso / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
+          nu_km1 = phdif->nu_iso / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
+          nuf_i = 0.5*(nu_ijk - nu_im1)
+          nuf_j = 0.5*(nu_ijk - nu_jm1)
+          nuf_k = 0.5*(nu_ijk - nu_km1)
+          denf_i = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j,i-1));
+          denf_j = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j-1,i));
+          denf_k = 0.5*(prim(IDN,k,j,i)+prim(IDN,k-1,j,i));
+          dTdx = (prim(IPR,k,j,i)/prim(IDN,k,j,i) - prim(IPR,k,j,i-1)/
+                  prim(IDN,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+          dTdy = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k,j-1,i)/
+                    prim(IDN,k,j-1,i))/pmb->pcoord->h2v(i)/pmb->pcoord->dx2v(j-1);
+          dTdz = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k-1,j,i)/
+                   prim(IDN,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+          flux1 = nuf_i*denf_i*dTdx;
+          flux2 = nuf_j*denf_j*dTdy;
+          flux3 = nuf_k*denf_k*dTdz;
+          flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3))
+          flux_sat = nu_sat * sqrt(pow(prim(IPR,k,j,i),3)/prim(IDN,k,j,i));
+          flux /= (1.0 + abs(flux)/flux_sat);
+          phdif->nu(ISO,k,j,i) = flux / sqrt( SQR(denf_i * dTdx) + SQR(denf_j * dTdy) + SQR(denf_k * dTdz) );
+        }
+      }
+    }
+  }
+  return;
+}
+
+
+//----------------------------------------------------------------------------------------
+// Spitzer Viscosity  
+
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
+  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
+  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
+
+  if (phdif->nu_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i){
+          phdif->nu(ISO,k,j,i) = phdif->nu_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
+        }
+      }
+    }
+  }
+  return;
+}
+
+
+
 
 //----------------------------------------------------------------------------------------
 // Cooling losses
