@@ -577,7 +577,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         v_esc2 += 0.5 * (grav_accel(r) + grav_accel(r_outer));
         v_esc2 *= (r_outer - r)/1000.;
         Real rho, v;
-        v = sqrt( v_out*v_out + v_esc2);
+        v = sqrt( v_out*v_out + 2.*v_esc2);
         rho     = Mdot_init/(4*PI*r*r*v);
         phydro->w(IDN,k,j,i) = rho;
         phydro->w(IPR,k,j,i) = cs_out*cs_out*rho;
@@ -1180,7 +1180,6 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 void VariableMdotOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
-  Real vc_ta  = sqrt( grav_accel(r_outer) * r_outer );
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
