@@ -563,8 +563,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   }
 
 
-  Real phi_ta = fabs(grav_pot(r_outer));
-  Real vc_ta  = sqrt( grav_accel(r_outer) * r_outer );
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     for (int j = jl; j <= ju; ++j) {
@@ -1185,7 +1183,7 @@ void VariableMdotOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &pr
       for (int i=1; i<=(NGHOST); ++i) {
         Real r = pco->x1v(i);
         Real rho, Mdot;
-        Mdot = (Mdot_init-Mdot_final)*((Mdot_timescale-time)/Mdot_timescale);
+        Mdot = exp((log(Mdot_final)-log(Mdot_init))*(time/Mdot_timescale) + log(Mdot_init));
         rho = Mdot / (4 * PI * r*r * v_out);
         prim(IDN,k,j,ie+i) = rho;
         prim(IVX,k,j,ie+i) = -1.0*v_out;
