@@ -64,6 +64,7 @@ static Real t_cool_start;
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
 
+static Real kappa_sat, nu_sat;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -346,7 +347,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
   EnrollUserTimeStepFunction(cooling_timestep);
 
-  if (pin->GetOrAddReal("problem","kappa_sat",0.0) != 0.0){
+
+  kappa_sat = pin->GetOrAddReal("problem","kappa_sat",0.0);
+  nu_sat = pin->GetOrAddReal("problem","nu_sat",0.0);
+  if (kappa_sat == 0.0){
     EnrollViscosityCoefficient(SpitzerViscosity);
     EnrollConductionCoefficient(SpitzerConduction);
   } else {
