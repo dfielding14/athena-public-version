@@ -82,7 +82,7 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
           kappaf = 0.5*(kappa(ISO,k,j,i)+kappa(ISO,k-1,j,i));
           denf = 0.5*(prim(IDN,k,j,i)+prim(IDN,k-1,j,i));
           dTdz = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k-1,j,i)/
-                   prim(IDN,k-1,j,i))/pco_->dx3v(k-1)/pco_->h31v(i)/pco_- >h32v(j);
+                   prim(IDN,k-1,j,i))/pco_->dx3v(k-1)/pco_->h31v(i)/pco_->h32v(j);
           x3flux(k,j,i) -= kappaf*denf*dTdz;
         }
       }
