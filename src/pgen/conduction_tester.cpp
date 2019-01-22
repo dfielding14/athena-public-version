@@ -350,7 +350,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     EnrollConductionCoefficient(SpitzerConduction);
   } else {
     EnrollViscosityCoefficient(SpitzerViscositySaturated);
-    EnrollConductionCoefficient(SpitzerViscosityConduction);
+    EnrollConductionCoefficient(SpitzerConductionSaturated);
   }
   
 
