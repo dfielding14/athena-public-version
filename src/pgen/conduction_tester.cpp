@@ -18,6 +18,7 @@
 #include "../field/field.hpp"              // Field
 #include "../hydro/hydro.hpp"              // Hydro
 #include "../fft/turbulence.hpp"           // Turbulence
+#include "../hydro/hydro_diffusion/hydrodiffusion.hpp" // diffusion
 
 // External library headers
 #include <hdf5.h>  // H5*, hid_t, hsize_t, H5*()
