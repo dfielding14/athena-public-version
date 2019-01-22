@@ -747,8 +747,6 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
 
 void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
      const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
-  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
   Real nu_ijk, nu_im1, nu_jm1, nu_km1;
   Real nuf_i, denf_i; // , pressf_i
   Real nuf_j, denf_j; // , pressf_j
@@ -798,9 +796,6 @@ void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
 
 void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
      const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
-  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
-
   if (phdif->nu_iso > 0.0) {
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
