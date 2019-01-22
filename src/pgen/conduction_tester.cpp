@@ -345,6 +345,15 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
   EnrollUserTimeStepFunction(cooling_timestep);
 
+  if (pin->GetOrAddReal("problem","kappa_sat",0.0) != 0.0){
+    EnrollViscosityCoefficient(SpitzerViscosity);
+    EnrollConductionCoefficient(SpitzerConduction);
+  } else {
+    EnrollViscosityCoefficient(SpitzerViscositySaturated);
+    EnrollConductionCoefficient(SpitzerViscosityConduction);
+  }
+  
+
   return;
 }
 
