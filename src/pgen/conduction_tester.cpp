@@ -707,7 +707,7 @@ void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Ath
           flux1 = kappaf_i*denf_i*dTdx;
           flux2 = kappaf_j*denf_j*dTdy;
           flux3 = kappaf_k*denf_k*dTdz;
-          flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3))
+          flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3));
           flux_sat = kappa_sat * sqrt(pow(prim(IPR,k,j,i),3)/prim(IDN,k,j,i));
           flux /= (1.0 + abs(flux)/flux_sat);
           phdif->kappa(ISO,k,j,i) = flux / sqrt( SQR(denf_i * dTdx) + SQR(denf_j * dTdy) + SQR(denf_k * dTdz) );
@@ -779,7 +779,7 @@ void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
           flux1 = nuf_i*denf_i*dTdx;
           flux2 = nuf_j*denf_j*dTdy;
           flux3 = nuf_k*denf_k*dTdz;
-          flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3))
+          flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3));
           flux_sat = nu_sat * sqrt(pow(prim(IPR,k,j,i),3)/prim(IDN,k,j,i));
           flux /= (1.0 + abs(flux)/flux_sat);
           phdif->nu(ISO,k,j,i) = flux / sqrt( SQR(denf_i * dTdx) + SQR(denf_j * dTdy) + SQR(denf_k * dTdz) );
