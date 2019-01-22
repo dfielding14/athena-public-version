@@ -64,7 +64,7 @@ static Real t_cool_start;
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
 
-static Real kappa_sat, nu_sat;
+static Real kappa_sat, nu_sat, diffusivity_scale;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -98,6 +98,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho_0 = pin->GetReal("problem", "rho_0");
   pgas_0 = pin->GetReal("problem", "pgas_0");
   temperature_max = pin->GetReal("hydro", "tceil");
+  diffusivity_scale = length_scale * vel_scale;
 
   // Read cooling-table-related parameters from input file
   rho_table_min = pin->GetReal("problem", "rho_table_min");
@@ -692,10 +693,10 @@ void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Ath
       for (int j=js; j<=je; ++j) {
 #pragma omp simd
         for (int i=is; i<=ie; ++i){
-          kappa_ijk = phdif->kappa_iso / prim(IDN,k,j,i)   * pow( prim(IPR,k,j,i)  /prim(IDN,k,j,i)   ,2.5);
-          kappa_im1 = phdif->kappa_iso / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
-          kappa_jm1 = phdif->kappa_iso / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
-          kappa_km1 = phdif->kappa_iso / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
+          kappa_ijk = (phdif->kappa_iso/diffusivity_scale) / prim(IDN,k,j,i)   * pow( prim(IPR,k,j,i)  /prim(IDN,k,j,i)   ,2.5);
+          kappa_im1 = (phdif->kappa_iso/diffusivity_scale) / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
+          kappa_jm1 = (phdif->kappa_iso/diffusivity_scale) / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
+          kappa_km1 = (phdif->kappa_iso/diffusivity_scale) / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
           kappaf_i = 0.5*(kappa_ijk - kappa_im1);
           kappaf_j = 0.5*(kappa_ijk - kappa_jm1);
           kappaf_k = 0.5*(kappa_ijk - kappa_km1);
@@ -734,7 +735,7 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
       for (int j=js; j<=je; ++j) {
 #pragma omp simd
         for (int i=is; i<=ie; ++i){
-          phdif->kappa(ISO,k,j,i) = phdif->kappa_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
+          phdif->kappa(ISO,k,j,i) = (phdif->kappa_iso/diffusivity_scale) / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
         }
       }
     }
@@ -764,10 +765,10 @@ void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
       for (int j=js; j<=je; ++j) {
 #pragma omp simd
         for (int i=is; i<=ie; ++i){
-          nu_ijk = phdif->nu_iso / prim(IDN,k,j,i)   * pow( prim(IPR,k,j,i)  /prim(IDN,k,j,i)   ,2.5);
-          nu_im1 = phdif->nu_iso / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
-          nu_jm1 = phdif->nu_iso / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
-          nu_km1 = phdif->nu_iso / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
+          nu_ijk = (phdif->nu_iso/diffusivity_scale) / prim(IDN,k,j,i)   * pow( prim(IPR,k,j,i)  /prim(IDN,k,j,i)   ,2.5);
+          nu_im1 = (phdif->nu_iso/diffusivity_scale) / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
+          nu_jm1 = (phdif->nu_iso/diffusivity_scale) / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
+          nu_km1 = (phdif->nu_iso/diffusivity_scale) / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
           nuf_i = 0.5*(nu_ijk - nu_im1);
           nuf_j = 0.5*(nu_ijk - nu_jm1);
           nuf_k = 0.5*(nu_ijk - nu_km1);
@@ -805,7 +806,7 @@ void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<R
       for (int j=js; j<=je; ++j) {
 #pragma omp simd
         for (int i=is; i<=ie; ++i){
-          phdif->nu(ISO,k,j,i) = phdif->nu_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
+          phdif->nu(ISO,k,j,i) = (phdif->nu_iso/diffusivity_scale) / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
         }
       }
     }
