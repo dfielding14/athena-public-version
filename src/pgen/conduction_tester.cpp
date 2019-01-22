@@ -442,7 +442,7 @@ Real cooling_timestep(MeshBlock *pmb)
 {
   if (pmb->pmy_mesh->time == 0.0){
     return 1.0e-6;
-  } else if (t < t_cool_start){
+  } else if (pmb->pmy_mesh->time < t_cool_start){
     return HUGE_NUMBER;
   } else {
     Real min_dt=1.0e10;
@@ -665,11 +665,9 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
 
 void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
      const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
-  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
   Real kappa_ijk, kappa_im1, kappa_jm1, kappa_km1;
   Real kappaf_i, denf_i; // , pressf_i
-  Reak kappaf_j, denf_j; // , pressf_j
+  Real kappaf_j, denf_j; // , pressf_j
   Real kappaf_k, denf_k; // , pressf_k
   Real dTdx, dTdy, dTdz;
   Real flux1, flux2, flux3, flux; 
@@ -716,8 +714,6 @@ void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Ath
 
 void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
      const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-  int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
-  int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
 
   if (phdif->kappa_iso > 0.0) {
     for (int k=ks; k<=ke; ++k) {
@@ -745,7 +741,7 @@ void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
   int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
   Real nu_ijk, nu_im1, nu_jm1, nu_km1;
   Real nuf_i, denf_i; // , pressf_i
-  Reak nuf_j, denf_j; // , pressf_j
+  Real nuf_j, denf_j; // , pressf_j
   Real nuf_k, denf_k; // , pressf_k
   Real dTdx, dTdy, dTdz;
   Real flux1, flux2, flux3, flux; 
