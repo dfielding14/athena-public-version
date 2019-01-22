@@ -1188,7 +1188,7 @@ void VariableMdotOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &pr
         Mdot = (Mdot_init-Mdot_final)*((Mdot_timescale-time)/Mdot_timescale);
         rho = Mdot / (4 * PI * r*r * v_out);
         prim(IDN,k,j,ie+i) = rho;
-        prim(IVX,k,j,ie+i) = -v_out;
+        prim(IVX,k,j,ie+i) = -1.0*v_out;
         prim(IVY,k,j,ie+i) = 0.0;
         prim(IVZ,k,j,ie+i) = 0.0;
         prim(IPR,k,j,ie+i) = rho*cs_out*cs_out;
