@@ -98,7 +98,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho_0 = pin->GetReal("problem", "rho_0");
   pgas_0 = pin->GetReal("problem", "pgas_0");
   temperature_max = pin->GetReal("hydro", "tceil");
-  diffusivity_scale = length_scale * vel_scale;
+  Real mu = 0.62 ; // appropriate for fully ionized plasma
+  Real mp = 1.67373522381e-24;
+  Real kb = 1.3806488e-16;
+  // diffusivitiy scale also handles conversion from n[cm^-3] and T[K] to code units
+  diffusivity_scale = (length_scale * vel_scale) / ( pow( mu*mp*pgas_scale/(kb*rho_scale),2.5) * (mu*mp/rho_scale) );
 
   // Read cooling-table-related parameters from input file
   rho_table_min = pin->GetReal("problem", "rho_table_min");
