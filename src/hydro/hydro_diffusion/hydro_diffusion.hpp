@@ -47,7 +47,7 @@ public:
   AthenaArray<Real> nu; // viscosity array
 
   Real kappa_iso, kappa_aniso; // thermal conduction coeff
-  Real kappa_sat; // thermal conduction saturation coeff
+  Real kappa_sat; // thermal conduction saturation coeff — DF
   AthenaArray<Real> cndflx[3]; // thermal stress tensor
   AthenaArray<Real> kappa; // conduction array
 

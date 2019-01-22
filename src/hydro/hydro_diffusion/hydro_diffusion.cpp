@@ -63,7 +63,7 @@ HydroDiffusion::HydroDiffusion(Hydro *phyd, ParameterInput *pin) {
   if (NON_BAROTROPIC_EOS) {
     kappa_iso  = pin->GetOrAddReal("problem","kappa_iso",0.0); // iso thermal conduction
     kappa_aniso  = pin->GetOrAddReal("problem","kappa_aniso",0.0); // aniso conduction
-    kappa_sat  = pin->GetOrAddReal("problem","kappa_sat",0.0); // saturated conduction
+    kappa_sat  = pin->GetOrAddReal("problem","kappa_sat",1.0e15); // saturated conduction — DF
     if (kappa_iso > 0.0 || kappa_aniso > 0.0) {
       hydro_diffusion_defined = true;
       cndflx[X1DIR].NewAthenaArray(ncells3,ncells2,ncells1+1);
@@ -72,7 +72,7 @@ HydroDiffusion::HydroDiffusion(Hydro *phyd, ParameterInput *pin) {
 
       kappa.NewAthenaArray(2,ncells3,ncells2,ncells1);
       if(pmb_->pmy_mesh->ConductionCoeff_==NULL)
-        CalcCondCoeff_ = ConstConduction;
+        CalcCondCoeff_ = SpitzerConduction; // ConstConduction; DF --- should write my own EnrollConductionFunction or something
       else
         CalcCondCoeff_ = pmb_->pmy_mesh->ConductionCoeff_;
     }
