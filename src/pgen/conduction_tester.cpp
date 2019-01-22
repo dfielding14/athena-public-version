@@ -692,9 +692,9 @@ void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Ath
           kappa_im1 = phdif->kappa_iso / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
           kappa_jm1 = phdif->kappa_iso / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
           kappa_km1 = phdif->kappa_iso / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
-          kappaf_i = 0.5*(kappa_ijk - kappa_im1)
-          kappaf_j = 0.5*(kappa_ijk - kappa_jm1)
-          kappaf_k = 0.5*(kappa_ijk - kappa_km1)
+          kappaf_i = 0.5*(kappa_ijk - kappa_im1);
+          kappaf_j = 0.5*(kappa_ijk - kappa_jm1);
+          kappaf_k = 0.5*(kappa_ijk - kappa_km1);
           denf_i = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j,i-1));
           denf_j = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j-1,i));
           denf_k = 0.5*(prim(IDN,k,j,i)+prim(IDN,k-1,j,i));
@@ -764,9 +764,9 @@ void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
           nu_im1 = phdif->nu_iso / prim(IDN,k,j,i-1) * pow( prim(IPR,k,j,i-1)/prim(IDN,k,j,i-1) ,2.5);
           nu_jm1 = phdif->nu_iso / prim(IDN,k,j-1,i) * pow( prim(IPR,k,j-1,i)/prim(IDN,k,j-1,i) ,2.5);
           nu_km1 = phdif->nu_iso / prim(IDN,k-1,j,i) * pow( prim(IPR,k-1,j,i)/prim(IDN,k-1,j,i) ,2.5);
-          nuf_i = 0.5*(nu_ijk - nu_im1)
-          nuf_j = 0.5*(nu_ijk - nu_jm1)
-          nuf_k = 0.5*(nu_ijk - nu_km1)
+          nuf_i = 0.5*(nu_ijk - nu_im1);
+          nuf_j = 0.5*(nu_ijk - nu_jm1);
+          nuf_k = 0.5*(nu_ijk - nu_km1);
           denf_i = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j,i-1));
           denf_j = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j-1,i));
           denf_k = 0.5*(prim(IDN,k,j,i)+prim(IDN,k-1,j,i));
