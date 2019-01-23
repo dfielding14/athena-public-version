@@ -320,7 +320,7 @@ void HydroDiffusion::NewHydroDiffusionDt(Real &dt_vis, Real &dt_cnd) {
       if ((kappa_iso > 0.0) || (kappa_aniso > 0.0)) {
         for (int i=is; i<=ie; ++i)
           dt_cnd = std::min(dt_cnd, static_cast<Real>(SQR(len(i))
-                                  *fac/(kappa_t(i)+TINY_NUMBER))); // I should update this to account for the saturation of the conductive flux
+                                  *fac/(kappa_t(i)+TINY_NUMBER)));
       }
     }
   }
