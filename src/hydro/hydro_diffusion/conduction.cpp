@@ -1,3 +1,9 @@
+//========================================================================================
+// Athena++ astrophysical MHD code
+// Copyright(C) 2014 James M. Stone <jmstone@princeton.edu> and other code contributors
+// Licensed under the 3-clause BSD License, see LICENSE file for details
+//========================================================================================
+
 // Athena++ headers
 #include "hydro_diffusion.hpp"
 #include "../../athena.hpp"
@@ -19,6 +25,7 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
   int is = pmb_->is; int js = pmb_->js; int ks = pmb_->ks;
   int ie = pmb_->ie; int je = pmb_->je; int ke = pmb_->ke;
   Real kappaf, denf, dTdx, dTdy, dTdz;
+  Real flux1, flux2, flux3, pressf, flux_sat; // DF
 
   // i-direction
   jl=js, ju=je, kl=ks, ku=ke;
@@ -36,12 +43,17 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
       for (int i=is; i<=ie+1; ++i) {
         kappaf = 0.5*(kappa(ISO,k,j,i)+kappa(ISO,k,j,i-1));
         denf = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j,i-1));
+        pressf = 0.5*(prim(IPR,k,j,i)+prim(IPR,k,j,i-1)); // DF
         dTdx = (prim(IPR,k,j,i)/prim(IDN,k,j,i) - prim(IPR,k,j,i-1)/
                 prim(IDN,k,j,i-1))/pco_->dx1v(i-1);
-        x1flux(k,j,i) -= kappaf*denf*dTdx;
+        flux1 = kappaf*denf*dTdx; // DF
+        // qsat = 5 phi P c = kappa_sat * sqrt(P^3/rho) --- cowie + mckee 77 eq8
+        flux_sat = kappa_sat * sqrt(pow(pressf,3)/denf);  // DF
+        x1flux(k,j,i) -= flux1 / (1 + abs(flux1)/flux_sat);    // DF
       }
     }
   }
+
 
   // j-direction
   il=is, iu=ie, kl=ks, ku=ke;
@@ -58,9 +70,12 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
         for (int i=il; i<=iu; ++i) {
           kappaf = 0.5*(kappa(ISO,k,j,i)+kappa(ISO,k,j-1,i));
           denf = 0.5*(prim(IDN,k,j,i)+prim(IDN,k,j-1,i));
+          pressf = 0.5*(prim(IPR,k,j,i)+prim(IPR,k,j-1,i)); // DF
           dTdy = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k,j-1,i)/
                     prim(IDN,k,j-1,i))/pco_->h2v(i)/pco_->dx2v(j-1);
-          x2flux(k,j,i) -= kappaf*denf*dTdy;
+          flux2 = kappaf*denf*dTdy; // DF
+          flux_sat = kappa_sat * sqrt(pow(pressf,3)/denf); // DF
+          x2flux(k,j,i) -= flux2 / (1 + abs(flux2)/flux_sat); // DF
         }
       }
     }
@@ -81,9 +96,12 @@ void HydroDiffusion::ThermalFlux_iso(const AthenaArray<Real> &prim,
         for (int i=il; i<=iu; ++i) {
           kappaf = 0.5*(kappa(ISO,k,j,i)+kappa(ISO,k-1,j,i));
           denf = 0.5*(prim(IDN,k,j,i)+prim(IDN,k-1,j,i));
+          pressf = 0.5*(prim(IPR,k,j,i)+prim(IPR,k-1,j,i));
           dTdz = (prim(IPR,k,j,i)/prim(IDN,k,j,i)-prim(IPR,k-1,j,i)/
                    prim(IDN,k-1,j,i))/pco_->dx3v(k-1)/pco_->h31v(i)/pco_->h32v(j);
-          x3flux(k,j,i) -= kappaf*denf*dTdz;
+          flux3 = kappaf*denf*dTdz; // DF
+          flux_sat = kappa_sat * sqrt(pow(pressf,3)/denf); // DF
+          x3flux(k,j,i) -= flux3 / (1 + abs(flux3)/flux_sat); // DF
         }
       }
     }
@@ -115,6 +133,34 @@ void ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Re
 #pragma omp simd
         for (int i=is; i<=ie; ++i)
           phdif->kappa(ISO,k,j,i) = phdif->kappa_iso;
+      }
+    }
+  }
+  if (phdif->kappa_aniso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i)
+          phdif->kappa(ANI,k,j,i) = phdif->kappa_aniso;
+      }
+    }
+  }
+  return;
+}
+
+
+
+//----------------------------------------------------------------------------------------
+// Spitzer conduction
+
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
+  if (phdif->kappa_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+#pragma omp simd
+        for (int i=is; i<=ie; ++i)
+          phdif->kappa(ISO,k,j,i) = phdif->kappa_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
       }
     }
   }

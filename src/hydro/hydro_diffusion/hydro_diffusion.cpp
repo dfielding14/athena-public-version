@@ -35,6 +35,7 @@ HydroDiffusion::HydroDiffusion(Hydro *phyd, ParameterInput *pin) {
   // Check if viscous process.
   nu_iso = pin->GetOrAddReal("problem","nu_iso",0.0); // iso viscosity
   nu_aniso = pin->GetOrAddReal("problem","nu_aniso",0.0); // aniso viscosity
+  // nu_sat  = pin->GetOrAddReal("problem","nu_sat",HUGE_NUMBER); // DF saturated value for conduction ????
   if (nu_iso > 0.0 || nu_aniso  > 0.0) {
     hydro_diffusion_defined = true;
     // Allocate memory for fluxes.
@@ -63,6 +64,7 @@ HydroDiffusion::HydroDiffusion(Hydro *phyd, ParameterInput *pin) {
   if (NON_BAROTROPIC_EOS) {
     kappa_iso  = pin->GetOrAddReal("problem","kappa_iso",0.0); // iso thermal conduction
     kappa_aniso  = pin->GetOrAddReal("problem","kappa_aniso",0.0); // aniso conduction
+    kappa_sat  = pin->GetOrAddReal("problem","kappa_sat",HUGE_NUMBER); // DF saturated value for conduction 
     if (kappa_iso > 0.0 || kappa_aniso > 0.0) {
       hydro_diffusion_defined = true;
       cndflx[X1DIR].NewAthenaArray(ncells3,ncells2,ncells1+1);
