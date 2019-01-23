@@ -727,7 +727,6 @@ void SpitzerConductionSaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Ath
           flux2 /= (1.0 + abs(flux2)/flux_sat2);
           flux3 /= (1.0 + abs(flux3)/flux_sat3);
           flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3));
-          flux /= (1.0 + abs(flux)/flux_sat);
           den_grad_T_mag = sqrt( SQR(denf_i * dTdx) + SQR(denf_j * dTdy) + SQR(denf_k * dTdz) );
           phdif->kappa(ISO,k,j,i) = (den_grad_T_mag == 0) ? 0.0 : flux / den_grad_T_mag;
         }
@@ -808,7 +807,6 @@ void SpitzerViscositySaturated(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
           flux2 /= (1.0 + abs(flux2)/flux_sat2);
           flux3 /= (1.0 + abs(flux3)/flux_sat3);
           flux = sqrt(SQR(flux1)+SQR(flux2)+SQR(flux3));
-          flux /= (1.0 + abs(flux)/flux_sat);
           den_grad_T_mag = sqrt( SQR(denf_i * dTdx) + SQR(denf_j * dTdy) + SQR(denf_k * dTdz) );
           phdif->nu(ISO,k,j,i) = (den_grad_T_mag == 0) ? 0.0 : flux / den_grad_T_mag;
         }
