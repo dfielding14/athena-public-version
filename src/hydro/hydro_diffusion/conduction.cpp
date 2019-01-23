@@ -149,29 +149,3 @@ void ConstConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Re
 }
 
 
-
-//----------------------------------------------------------------------------------------
-// Spitzer conduction
-
-void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
-     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-  if (phdif->kappa_iso > 0.0) {
-    for (int k=ks; k<=ke; ++k) {
-      for (int j=js; j<=je; ++j) {
-#pragma omp simd
-        for (int i=is; i<=ie; ++i)
-          phdif->kappa(ISO,k,j,i) = phdif->kappa_iso / prim(IDN,k,j,i) * pow( prim(IPR,k,j,i)/prim(IDN,k,j,i) ,2.5);
-      }
-    }
-  }
-  if (phdif->kappa_aniso > 0.0) {
-    for (int k=ks; k<=ke; ++k) {
-      for (int j=js; j<=je; ++j) {
-#pragma omp simd
-        for (int i=is; i<=ie; ++i)
-          phdif->kappa(ANI,k,j,i) = phdif->kappa_aniso;
-      }
-    }
-  }
-  return;
-}
