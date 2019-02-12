@@ -395,9 +395,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for (int k=ks; k<=ke+1; k++) {
       for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie+1; i++) {
-          pfield->b.x1f(k,j,i) = 0.0;
+          pfield->b.x1f(k,j,i) = std::sqrt(2.0 * phydro->w(IPR,k,j,i)/beta);
           pfield->b.x2f(k,j,i) = 0.0;
-          pfield->b.x3f(k,j,i) = std::sqrt(2.0 * pgas_0/beta);
+          pfield->b.x3f(k,j,i) = 0.0;
         }
       }
     }
@@ -405,7 +405,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie; i++) {
-          phydro->u(IEN,k,j,i) += 0.5*SQR(pfield->b.x3f(k,j,i));
+          phydro->u(IEN,k,j,i) += 0.5*SQR(pfield->b.x1f(k,j,i));
         }
       }
     }
