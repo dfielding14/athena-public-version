@@ -102,12 +102,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 #endif
   }
 
-  if (COORDINATE_SYSTEM != "spherical_polar"){
-    std::stringstream msg;
-    msg << "### FATAL ERROR can only be used with spherical_polar coordiantes " << std::endl;
-    throw std::runtime_error(msg.str().c_str());
-    return;
-  }
+  // if (COORDINATE_SYSTEM != "spherical_polar"){
+  //   std::stringstream msg;
+  //   msg << "### FATAL ERROR can only be used with spherical_polar coordiantes " << std::endl;
+  //   throw std::runtime_error(msg.str().c_str());
+  //   return;
+  // }
 
 
   // Read general parameters from input file
