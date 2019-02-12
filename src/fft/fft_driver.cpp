@@ -30,15 +30,15 @@
 FFTDriver::FFTDriver(Mesh *pm, ParameterInput *pin) {
   pmy_mesh_=pm;
 
-  // if (pm->use_uniform_meshgen_fn_[X1DIR]==false
-  //     || pm->use_uniform_meshgen_fn_[X2DIR]==false
-  //     || pm->use_uniform_meshgen_fn_[X3DIR]==false) {
-  //   std::stringstream msg;
-  //   msg << "### FATAL ERROR in FFTDriver::FFTDriver" << std::endl
-  //       << "Non-uniform mesh spacing is not supported." << std::endl;
-  //   throw std::runtime_error(msg.str().c_str());
-  //   return;
-  // }
+  if (pm->use_uniform_meshgen_fn_[X1DIR]==false
+      || pm->use_uniform_meshgen_fn_[X2DIR]==false
+      || pm->use_uniform_meshgen_fn_[X3DIR]==false) {
+    std::stringstream msg;
+    msg << "### FATAL ERROR in FFTDriver::FFTDriver" << std::endl
+        << "Non-uniform mesh spacing is not supported." << std::endl;
+    throw std::runtime_error(msg.str().c_str());
+    return;
+  }
 
   dim_ = 1;
   if (pm->mesh_size.nx2 > 1) dim_=2;
