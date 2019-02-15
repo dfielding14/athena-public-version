@@ -553,8 +553,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   }
 
 
-  Real phi_ta = fabs(grav_pot(r_outer));
-  Real vc_ta  = sqrt( grav_accel(r_outer) * r_outer );
+  Real phi_ta = fabs(grav_pot(rvir));
+  Real vc_ta  = sqrt( grav_accel(rvir) * rvir );
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     for (int j = jl; j <= ju; ++j) {
@@ -566,11 +566,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real vc = sqrt(grav_accel(r) * r );
         Real v_phi;
         if (R_cyl <= r_circ){
-          rho = rho_ta * pow(r_outer / r_circ, gamma_adi*f2) * exp(-0.5*gamma_adi*f_cs);
-          rho *= SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*(f_cs-f2)) * pow(sin(theta),gamma_adi*f2);
+          rho = rho_ta * pow(rvir / r_circ, gamma_adi*f2) * exp(-0.5*gamma_adi*f_cs);
+          rho *= SQR(vc_ta/vc) * pow(r/rvir,-gamma_adi*(f_cs-f2)) * pow(sin(theta),gamma_adi*f2);
           v_phi = sqrt(f2/f_cs) * vc;
         } else {
-          rho = rho_ta * SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f_cs*SQR(r_circ/R_cyl));
+          rho = rho_ta * SQR(vc_ta/vc) * pow(r/rvir,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f_cs*SQR(r_circ/R_cyl));
           v_phi = vc * r_circ / R_cyl;
         }
         press   = SQR(vc) * rho / (gamma_adi * f_cs); 
@@ -702,7 +702,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
   temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
   
-  Real phi_ta = grav_pot(r_outer);
+  Real phi_ta = grav_pot(rvir);
 
   // Calculate cooling on all blocks
   if (pmb->lid == 0) {
@@ -1147,18 +1147,19 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-        Real r = pco->x1v(ie+i);
-        Real theta = pco->x2v(j);
-        prim(IDN,k,j,ie+i) = rho_ta;
-        prim(IVX,k,j,ie+i) = 0.0;
-        prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -vc_ta*r_circ / (r*sin(theta));
-        prim(IPR,k,j,ie+i) = rho_ta*SQR(vc_ta)/(gamma_adi*f_cs);
-#if MAGNETIC_FIELDS_ENABLED
-        b.x1f(k,j,ie+i) = 0.0;
-        b.x2f(k,j,ie+i) = 0.0;
-        b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
-#endif
+// THIS IS BROKEN NEEDS TO ACCOUNT FOR ANGLE AND STUFF
+//         Real r = pco->x1v(ie+i);
+//         Real theta = pco->x2v(j);
+//         prim(IDN,k,j,ie+i) = rho_ta;
+//         prim(IVX,k,j,ie+i) = 0.0;
+//         prim(IVY,k,j,ie+i) = 0.0;
+//         prim(IVZ,k,j,ie+i) = -vc_ta*r_circ / (r*sin(theta));
+//         prim(IPR,k,j,ie+i) = rho_ta*SQR(vc_ta)/(gamma_adi*f_cs);
+// #if MAGNETIC_FIELDS_ENABLED
+//         b.x1f(k,j,ie+i) = 0.0;
+//         b.x2f(k,j,ie+i) = 0.0;
+//         b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+// #endif
       }
     }
   }
