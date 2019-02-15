@@ -57,7 +57,7 @@ static Real pfloor, dfloor, vceil;
 static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
-static Real cs, rho_ta, f_cs;
+static Real cs, rho_ta, f_cs,f2;
 
 static Real r_inner, r_outer;
 
@@ -148,7 +148,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // ICs
   r_inner      = mesh_size.x1min;
   r_outer      = mesh_size.x1max;
-  f_cs         = pin->GetOrAddReal("problem","f_cs",0.6);
   rho_ta       = pin->GetReal("problem", "rho_ta")/rho_scale;
   
   // floor
@@ -196,6 +195,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rotation = pin->GetBoolean("problem", "rotation");
   lambda = pin->GetOrAddReal("problem", "lambda", 0.0);
   r_circ = lambda * rvir;
+  f_cs         = pin->GetOrAddReal("problem","f_cs",1.0);
+  f2           = pin->GetOrAddReal("problem","f2",1.0);
 
 
 
@@ -565,14 +566,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real vc = sqrt(grav_accel(r) * r );
         Real v_phi;
         if (R_cyl <= r_circ){
-          rho = rho_ta * pow(r_outer / r_circ, gamma*f2) * exp(-0.5*gamma*f);
-          rho *= SQR(vc_ta/vc) * pow(r/r_outer,-gamma*(f-f2)) * pow(sin(theta),gamma*f2);
-          v_phi = sqrt(f2/f) * vc;
+          rho = rho_ta * pow(r_outer / r_circ, gamma_adi*f2) * exp(-0.5*gamma_adi*f_cs);
+          rho *= SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*(f_cs-f2)) * pow(sin(theta),gamma_adi*f2);
+          v_phi = sqrt(f2/f_cs) * vc;
         } else {
-          rho = rho_ta * SQR(vc_ta/vc) * pow(r/r_outer,-gamma*f) * exp(-0.5*gamma*f*SQR(r_circ/R_cyl));
+          rho = rho_ta * SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f*SQR(r_circ/R_cyl));
           v_phi = vc * r_circ / R_cyl;
         }
-        press   = SQR(vc) * rho / (gamma * f); 
+        press   = SQR(vc) * rho / (gamma_adi * f); 
         phydro->w(IDN,k,j,i) = rho;
         phydro->w(IPR,k,j,i) = press;
         phydro->w(IVX,k,j,i) = 0.0;
@@ -1146,13 +1147,13 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-        Real r = pcoord->x1v(ie+i);
-        Real theta = pcoord->x2v(j);
+        Real r = pco->x1v(ie+i);
+        Real theta = pco->x2v(j);
         prim(IDN,k,j,ie+i) = rho_ta;
         prim(IVX,k,j,ie+i) = 0.0;
         prim(IVY,k,j,ie+i) = 0.0;
         prim(IVZ,k,j,ie+i) = -vc*r_circ / (r*sin(theta));
-        prim(IPR,k,j,ie+i) = rho_ta*SQR(vc_ta)/(gamma*f);
+        prim(IPR,k,j,ie+i) = rho_ta*SQR(vc_ta)/(gamma_adi*f_cs);
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
