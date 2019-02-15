@@ -570,10 +570,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           rho *= SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*(f_cs-f2)) * pow(sin(theta),gamma_adi*f2);
           v_phi = sqrt(f2/f_cs) * vc;
         } else {
-          rho = rho_ta * SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f*SQR(r_circ/R_cyl));
+          rho = rho_ta * SQR(vc_ta/vc) * pow(r/r_outer,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f_cs*SQR(r_circ/R_cyl));
           v_phi = vc * r_circ / R_cyl;
         }
-        press   = SQR(vc) * rho / (gamma_adi * f); 
+        press   = SQR(vc) * rho / (gamma_adi * f_cs); 
         phydro->w(IDN,k,j,i) = rho;
         phydro->w(IPR,k,j,i) = press;
         phydro->w(IVX,k,j,i) = 0.0;
@@ -1152,7 +1152,7 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         prim(IDN,k,j,ie+i) = rho_ta;
         prim(IVX,k,j,ie+i) = 0.0;
         prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -vc*r_circ / (r*sin(theta));
+        prim(IVZ,k,j,ie+i) = -vc_ta*r_circ / (r*sin(theta));
         prim(IPR,k,j,ie+i) = rho_ta*SQR(vc_ta)/(gamma_adi*f_cs);
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
