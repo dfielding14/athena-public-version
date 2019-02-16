@@ -1156,8 +1156,8 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-        Real r = pcoord->x1v(ie+i);
-        Real theta = pcoord->x2v(j);
+        Real r = pco->x1v(ie+i);
+        Real theta = pco->x2v(j);
         Real R_cyl = r*sin(theta);
         Real rho, press;
         Real vc = sqrt(grav_accel(r) * r );
