@@ -1156,19 +1156,31 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-// THIS IS BROKEN NEEDS TO ACCOUNT FOR ANGLE AND STUFF
-//         Real r = pco->x1v(ie+i);
-//         Real theta = pco->x2v(j);
-//         prim(IDN,k,j,ie+i) = rho_ta;
-//         prim(IVX,k,j,ie+i) = 0.0;
-//         prim(IVY,k,j,ie+i) = 0.0;
-//         prim(IVZ,k,j,ie+i) = -vc_ta*r_circ / (r*sin(theta));
-//         prim(IPR,k,j,ie+i) = rho_ta*SQR(vc_ta)/(gamma_adi*f_cs);
-// #if MAGNETIC_FIELDS_ENABLED
-//         b.x1f(k,j,ie+i) = 0.0;
-//         b.x2f(k,j,ie+i) = 0.0;
-//         b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
-// #endif
+        Real r = pcoord->x1v(ie+i);
+        Real theta = pcoord->x2v(j);
+        Real R_cyl = r*sin(theta);
+        Real rho, press;
+        Real vc = sqrt(grav_accel(r) * r );
+        Real v_phi;
+        if (R_cyl <= r_circ){
+          rho = rho_ta * pow(rvir / r_circ, gamma_adi*f2) * exp(-0.5*gamma_adi*f_cs);
+          rho *= SQR(vc_ta/vc) * pow(r/rvir,-gamma_adi*(f_cs-f2)) * pow(sin(theta),gamma_adi*f2);
+          v_phi = sqrt(f2/f_cs) * vc;
+        } else {
+          rho = rho_ta * SQR(vc_ta/vc) * pow(r/rvir,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f_cs*SQR(r_circ/R_cyl));
+          v_phi = vc * r_circ / R_cyl;
+        }
+        press   = SQR(vc) * rho / (gamma_adi * f_cs); 
+        prim(IDN,k,j,ie+i) = rho;
+        prim(IVX,k,j,ie+i) = 0.0;
+        prim(IVY,k,j,ie+i) = 0.0;
+        prim(IVZ,k,j,ie+i) = -v_phi;
+        prim(IPR,k,j,ie+i) = press; 
+#if MAGNETIC_FIELDS_ENABLED
+        b.x1f(k,j,ie+i) = 0.0;
+        b.x2f(k,j,ie+i) = 0.0;
+        b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+#endif
       }
     }
   }
