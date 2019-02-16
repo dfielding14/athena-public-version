@@ -565,6 +565,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real rho, press;
         Real vc = sqrt(grav_accel(r) * r );
         Real v_phi;
+
+        if(Globals::my_rank==0) {
+          std::cout << "r, theta, R_cyl, r_circ = " << r << theta << R_cyl << r_circ << " \n";
+        }
+
         if (R_cyl <= r_circ){
           rho = rho_ta * pow(rvir / r_circ, gamma_adi*f2) * exp(-0.5*gamma_adi*f_cs);
           rho *= SQR(vc_ta/vc) * pow(r/rvir,-gamma_adi*(f_cs-f2)) * pow(sin(theta),gamma_adi*f2);
