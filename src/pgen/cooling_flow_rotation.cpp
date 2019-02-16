@@ -578,9 +578,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           rho = rho_ta * SQR(vc_ta/vc) * pow(r/rvir,-gamma_adi*f_cs) * exp(-0.5*gamma_adi*f_cs*SQR(r_circ/R_cyl));
           v_phi = vc * r_circ / R_cyl;
         }
-        if ((k==16)&&(j==16)){
-          std::cout << "r, theta, R_cyl, r_circ, rho, v_phi = " << r << " " << theta << " " << R_cyl << " " << r_circ <<" " << rho <<" " << v_phi << " \n";
-        }
+        // if ((k==16)&&(j==16)){
+        //   std::cout << "r, theta, R_cyl, r_circ, rho, v_phi = " << r << " " << theta << " " << R_cyl << " " << r_circ <<" " << rho <<" " << v_phi << " \n";
+        // }
 
         press   = SQR(vc) * rho / (gamma_adi * f_cs); 
         phydro->w(IDN,k,j,i) = rho;
