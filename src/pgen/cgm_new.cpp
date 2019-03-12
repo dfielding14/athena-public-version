@@ -593,7 +593,6 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
 #endif
     delta_e_tot = gm[0];
     Average_T = gm[1]/gm[2];
-    std::cout << "Globals::my_rank = " << Globals::my_rank <<" gm[1] = " << gm[1] << " gm[2] = " << gm[2] << "\n";
   }
 
   // determine if cooling should start
