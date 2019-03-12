@@ -44,6 +44,8 @@ TurbulenceDriver::TurbulenceDriver(Mesh *pm, ParameterInput *pin)
   tcorr = pin->GetOrAddReal("problem","tcorr", 0.0); // correlation time scale
   z_turb = pin->GetOrAddReal("problem","z_turb", 0.0); // scale height of driving pattern 
   dpert = pin->GetOrAddReal("problem","dpert", 0.0); // density perturbation = delta_rho / rho 
+  f_solenoidal = pin->GetOrAddReal("problem","f_solenoidal", -1.0); // density perturbation = delta_rho / rho 
+
 
   if (pm->turb_flag == 0) {
     std::stringstream msg;
@@ -79,6 +81,18 @@ TurbulenceDriver::TurbulenceDriver(Mesh *pm, ParameterInput *pin)
   InitializeFFTBlock(true);
   QuickCreatePlan();
   dvol = pmy_fb->dx1*pmy_fb->dx2*pmy_fb->dx3;
+
+  if (f_solenoidal<=0.0) {
+    fv_solenoidal_ = new AthenaFFTComplex*[3];
+    fv_compressive_ = new AthenaFFTComplex*[3];
+    for (int nv=0; nv<3; nv++){
+      fv_solenoidal_[nv] = new AthenaFFTComplex[pmy_fb->cnt_];
+      fv_compressive_[nv] = new AthenaFFTComplex[pmy_fb->cnt_];
+    } 
+    if (Globals::my_rank==0)
+      std::cout << "Using solenoidal compressive partitioning with f_solenoidal = " << f_solenoidal <<"\n";
+  }
+
 
 }
 
@@ -158,7 +172,49 @@ void TurbulenceDriver::Generate(void) {
       AthenaFFTComplex *fv = pfb->in_;
 
       PowerSpectrum(fv);
-
+      if (f_solenoidal>=0.0){
+        // copy fv to fv_solenoidal
+        // subtract off the compressive part of fv_solenoidal
+        // make a new fv
+        // copy new fv to fv_compressive
+        // subtract off the solenoidal part of fv_compressive
+        // add fv_solenoidal to fv_compressive with the relative
+        //   strength set by f_solenoidal
+        // copy new combined fv to original fv and proceed
+        for (int k=0; k<knx3; k++) {
+          for (int j=0; j<knx2; j++) {
+            for (int i=0; i<knx1; i++) {
+              int64_t kidx=pfb->GetIndex(i,j,k,idx);
+              // Copy to fv_solenoidal_
+              fv_solenoidal_[nv][kidx][0] = fv[kidx][0];
+              fv_solenoidal_[nv][kidx][1] = fv[kidx][1];
+            }
+          }
+        }
+        Project(fv_solenoidal_, 1) // delete the compressive part 
+        PowerSpectrum(fv);
+        for (int k=0; k<knx3; k++) {
+          for (int j=0; j<knx2; j++) {
+            for (int i=0; i<knx1; i++) {
+              int64_t kidx=pfb->GetIndex(i,j,k,idx);
+              // Copy to fv_compressive_
+              fv_compressive_[nv][kidx][0] = fv[kidx][0];
+              fv_compressive_[nv][kidx][1] = fv[kidx][1];
+            }
+          }
+        }
+        Project(fv_compressive_, 0) // delete the solenoidal part
+        for (int k=0; k<knx3; k++) {
+          for (int j=0; j<knx2; j++) {
+            for (int i=0; i<knx1; i++) {
+              int64_t kidx=pfb->GetIndex(i,j,k,idx);
+              // Copy to back to fv with proper ratio
+              fv[kidx][0] = (1-f_solenoidal)*fv_compressive_[nv][kidx][0] + f_solenoidal*fv_solenoidal_[nv][kidx][0];
+              fv[kidx][1] = (1-f_solenoidal)*fv_compressive_[nv][kidx][1] + f_solenoidal*fv_solenoidal_[nv][kidx][1];
+            }
+          }
+        }
+      } // f_solenoidal>=0
       pfb->Execute(plan);
 
       for (int igid=nbs, nb=0;igid<=nbe;igid++, nb++) {
@@ -182,7 +238,42 @@ void TurbulenceDriver::Generate(void) {
       AthenaFFTComplex *fv = pfb->in_;
 
       PowerSpectrum(fv);
+      if (f_solenoidal>=0.0){
 
+        for (int k=0; k<knx3; k++) {
+          for (int j=0; j<knx2; j++) {
+            for (int i=0; i<knx1; i++) {
+              int64_t kidx=pfb->GetIndex(i,j,k,idx);
+              // Copy to fv_solenoidal_
+              fv_solenoidal_[nv][kidx][0] = fv[kidx][0];
+              fv_solenoidal_[nv][kidx][1] = fv[kidx][1];
+            }
+          }
+        }
+        Project(fv_solenoidal_, 1) // delete the compressive part 
+        PowerSpectrum(fv);
+        for (int k=0; k<knx3; k++) {
+          for (int j=0; j<knx2; j++) {
+            for (int i=0; i<knx1; i++) {
+              int64_t kidx=pfb->GetIndex(i,j,k,idx);
+              // Copy to fv_compressive_
+              fv_compressive_[nv][kidx][0] = fv[kidx][0];
+              fv_compressive_[nv][kidx][1] = fv[kidx][1];
+            }
+          }
+        }
+        Project(fv_compressive_, 0) // delete the solenoidal part
+        for (int k=0; k<knx3; k++) {
+          for (int j=0; j<knx2; j++) {
+            for (int i=0; i<knx1; i++) {
+              int64_t kidx=pfb->GetIndex(i,j,k,idx);
+              // Copy to back to fv with proper ratio
+              fv[kidx][0] = (1-f_solenoidal)*fv_compressive_[nv][kidx][0] + f_solenoidal*fv_solenoidal_[nv][kidx][0];
+              fv[kidx][1] = (1-f_solenoidal)*fv_compressive_[nv][kidx][1] + f_solenoidal*fv_solenoidal_[nv][kidx][1];
+            }
+          }
+        }
+      } // f_solenoidal>=0
       pfb->Execute(plan);
 
       for (int igid=nbs, nb=0;igid<=nbe;igid++, nb++) {
@@ -296,6 +387,69 @@ void TurbulenceDriver::PowerSpectrum(AthenaFFTComplex *amp) {
   }
   return;
 }
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void TurbulenceDriver::Project(AthenaFFTComplex **fv)
+//  \brief calculates divergence free part of the perturbation
+//         and then either removes it or keeps only it.
+
+void TurbulenceDriver::Project(AthenaFFTComplex **fv, int solenoidal) {
+  // if solenoidal == 1 then subtract off the div part 
+  // if solenoidal == 0 then keep div part
+  FFTBlock *pfb = pmy_fb;
+  AthenaFFTIndex *idx = pfb->b_in_;
+  int knx1=pfb->knx[0],knx2=pfb->knx[1],knx3=pfb->knx[2];
+  Real divsum = 0.0;
+  for (int k=0; k<knx3; k++) {
+    for (int j=0; j<knx2; j++) {
+      for (int i=0; i<knx1; i++) {
+        // Get khat
+        int64_t nx=GetKcomp(i,pfb->kdisp[0],pfb->kNx[0]);
+        int64_t ny=GetKcomp(j,pfb->kdisp[1],pfb->kNx[1]);
+        int64_t nz=GetKcomp(k,pfb->kdisp[2],pfb->kNx[2]);
+        Real kx=nx*pfb->dkx[0]; // dkx[i] gets weirdly permuted (based on meshblocks) when using MPI!!!
+        Real ky=ny*pfb->dkx[1]; // JS: I *think* I fixed, Lx[i] wasn't in the functions to swap and permute axes
+        Real kz=nz*pfb->dkx[2];
+        Real kmag = std::sqrt(kx*kx+ky*ky+kz*kz);
+        // khat stored in kx,ky,kz
+        kx /= kmag;
+        ky /= kmag;
+        kz /= kmag;
+        
+        int64_t kidx=pfb->GetIndex(i,j,k,idx);
+        if (kmag != 0.0) {
+          // Form (khat.f)
+          Real kdotf_re = kx*fv[0][kidx][0] + ky*fv[1][kidx][0] + kz*fv[2][kidx][0];
+          Real kdotf_im = kx*fv[0][kidx][1] + ky*fv[1][kidx][1] + kz*fv[2][kidx][1];
+          
+          if (solenoidal == 1){
+            fv[0][kidx][0] -= kdotf_re * kx;
+            fv[1][kidx][0] -= kdotf_re * ky;
+            fv[2][kidx][0] -= kdotf_re * kz;
+            
+            fv[0][kidx][1] -= kdotf_im * kx;
+            fv[1][kidx][1] -= kdotf_im * ky;
+            fv[2][kidx][1] -= kdotf_im * kz;
+          } 
+          if (solenoidal == 0){
+            fv[0][kidx][0] = kdotf_re * kx;
+            fv[1][kidx][0] = kdotf_re * ky;
+            fv[2][kidx][0] = kdotf_re * kz;
+            
+            fv[0][kidx][1] = kdotf_im * kx;
+            fv[1][kidx][1] = kdotf_im * ky;
+            fv[2][kidx][1] = kdotf_im * kz;
+          } 
+        }
+      }
+    }       
+  }
+  return;
+}
+
+
 
 //----------------------------------------------------------------------------------------
 //! \fn void TurbulenceDriver::Perturb(Real dt)

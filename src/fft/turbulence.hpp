@@ -36,6 +36,7 @@ public:
   void PerturbDensity();
   int64_t GetKcomp(int idx, int disp, int Nx);
   Real dedt;
+  void Project(AthenaFFTComplex **fv, int solenoidal);
 private:
   int64_t rseed;
   int nlow,nhigh;
@@ -44,6 +45,7 @@ private:
   Real expo,dvol;
   Real dpert;
   Real f_solenoidal;
+  AthenaFFTComplex **fv_solenoidal_, **fv_compressive_; // Arrays to store FTs of components
   AthenaArray<Real> *vel;
   AthenaArray<Real> *drho;
 };
