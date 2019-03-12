@@ -360,9 +360,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Enroll user-defined functions
   EnrollUserExplicitSourceFunction(Cooling_Conduction_TurbDriving);
-  AllocateUserHistoryOutput(2);
+  AllocateUserHistoryOutput(3);
   EnrollUserHistoryOutput(0, CoolingLosses, "e_cool");
   EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
+  EnrollUserHistoryOutput(2, CoolingLosses, "T_avg");
   EnrollUserTimeStepFunction(cooling_timestep);
 
   return;
