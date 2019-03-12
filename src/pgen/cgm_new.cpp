@@ -583,6 +583,7 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
       cons_local.DeleteAthenaArray();
       user_out_var_local.DeleteAthenaArray();
       pblock = pblock->next;
+      std::cout << "Globals::my_rank = " << Globals::my_rank <<" m[1] = " << m[1] << " m[2] = " << m[2] << "\n";
     }
 #ifdef MPI_PARALLEL
     MPI_Allreduce(m, gm, 3, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
