@@ -82,7 +82,7 @@ TurbulenceDriver::TurbulenceDriver(Mesh *pm, ParameterInput *pin)
   QuickCreatePlan();
   dvol = pmy_fb->dx1*pmy_fb->dx2*pmy_fb->dx3;
 
-  if (f_solenoidal<=0.0) {
+  if (f_solenoidal>=0.0) {
     fv_solenoidal_ = new AthenaFFTComplex*[3];
     fv_compressive_ = new AthenaFFTComplex*[3];
     for (int nv=0; nv<3; nv++){
@@ -194,25 +194,38 @@ void TurbulenceDriver::Generate(void) {
           }
         }
         Project(fv_solenoidal_, 1); // delete the compressive part 
-        PowerSpectrum(fv);
-        for (int k=0; k<knx3; k++) {
-          for (int j=0; j<knx2; j++) {
-            for (int i=0; i<knx1; i++) {
-              int64_t kidx=pfb->GetIndex(i,j,k,idx);
-              // Copy to fv_compressive_
-              fv_compressive_[nv][kidx][0] = fv[kidx][0];
-              fv_compressive_[nv][kidx][1] = fv[kidx][1];
+        if (f_solenoidal < 1.0){
+          PowerSpectrum(fv);
+          for (int k=0; k<knx3; k++) {
+            for (int j=0; j<knx2; j++) {
+              for (int i=0; i<knx1; i++) {
+                int64_t kidx=pfb->GetIndex(i,j,k,idx);
+                // Copy to fv_compressive_
+                fv_compressive_[nv][kidx][0] = fv[kidx][0];
+                fv_compressive_[nv][kidx][1] = fv[kidx][1];
+              }
             }
           }
-        }
-        Project(fv_compressive_, 0); // delete the solenoidal part
-        for (int k=0; k<knx3; k++) {
-          for (int j=0; j<knx2; j++) {
-            for (int i=0; i<knx1; i++) {
-              int64_t kidx=pfb->GetIndex(i,j,k,idx);
-              // Copy to back to fv with proper ratio
-              fv[kidx][0] = (1-f_solenoidal)*fv_compressive_[nv][kidx][0] + f_solenoidal*fv_solenoidal_[nv][kidx][0];
-              fv[kidx][1] = (1-f_solenoidal)*fv_compressive_[nv][kidx][1] + f_solenoidal*fv_solenoidal_[nv][kidx][1];
+          Project(fv_compressive_, 0); // delete the solenoidal part
+          for (int k=0; k<knx3; k++) {
+            for (int j=0; j<knx2; j++) {
+              for (int i=0; i<knx1; i++) {
+                int64_t kidx=pfb->GetIndex(i,j,k,idx);
+                // Copy to back to fv with proper ratio
+                fv[kidx][0] = (1-f_solenoidal)*fv_compressive_[nv][kidx][0] + f_solenoidal*fv_solenoidal_[nv][kidx][0];
+                fv[kidx][1] = (1-f_solenoidal)*fv_compressive_[nv][kidx][1] + f_solenoidal*fv_solenoidal_[nv][kidx][1];
+              }
+            }
+          }
+        } else { // f_solenoidal == 1
+          for (int k=0; k<knx3; k++) {
+            for (int j=0; j<knx2; j++) {
+              for (int i=0; i<knx1; i++) {
+                int64_t kidx=pfb->GetIndex(i,j,k,idx);
+                // Copy to back to fv with proper ratio
+                fv[kidx][0] = fv_solenoidal_[nv][kidx][0];
+                fv[kidx][1] = fv_solenoidal_[nv][kidx][1];
+              }
             }
           }
         }
@@ -230,6 +243,7 @@ void TurbulenceDriver::Generate(void) {
   } else { // with Ornstein-Uhlenbeck smoothing
     Real factor;
     factor = exp(-dtdrive/tcorr);
+    if (Globals::my_rank==0) std::cout << "starting generate with OU, factor = " << factor <<"\n";
 
     int is=pm->pblock->is, ie=pm->pblock->ie;
     int js=pm->pblock->js, je=pm->pblock->je;
@@ -241,7 +255,6 @@ void TurbulenceDriver::Generate(void) {
 
       PowerSpectrum(fv);
       if (f_solenoidal>=0.0){
-
         for (int k=0; k<knx3; k++) {
           for (int j=0; j<knx2; j++) {
             for (int i=0; i<knx1; i++) {
