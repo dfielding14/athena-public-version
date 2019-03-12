@@ -45,8 +45,8 @@ static Real overdensity_factor, overdensity_radius, overdensity_smoothing_length
 static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
 static Real pgas_table_min, pgas_table_max, pgas_table_n;
-static Real t_cool_start, cfl_cool;
-static bool heat_redistribute, rho_dependent_heat_redistribute, constant_energy;
+static Real T_cool_start, cfl_cool;
+static bool heat_redistribute, rho_dependent_heat_redistribute, constant_energy, cooling_on;
 static bool adaptive_driving, tophat_driving;
 static Real drive_duration, drive_separation, dedt_on;
 
@@ -119,9 +119,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   adaptive_driving = pin->GetBoolean("problem", "adaptive_driving");
   tophat_driving = pin->GetBoolean("problem", "tophat_driving");
 
-  t_cool_start = pin->GetReal("problem", "t_cool_start");
+  T_cool_start = pin->GetReal("problem", "T_cool_start");
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
-
+  cooling_on = false;
 
   drive_duration   = pin->GetReal("problem", "drive_duration");
   drive_separation = pin->GetReal("problem", "drive_separation");
@@ -378,9 +378,10 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   // Allocate storage for keeping track of cooling
   AllocateRealUserMeshBlockDataField(1);
-  ruser_meshblock_data[0].NewAthenaArray(2);
+  ruser_meshblock_data[0].NewAthenaArray(3);
   ruser_meshblock_data[0](0) = 0.0;
   ruser_meshblock_data[0](1) = 0.0;
+  ruser_meshblock_data[0](2) = 0.0;
 
   // Set output variables
   AllocateUserOutputVariables(2);
@@ -504,8 +505,9 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
 {
   // Prepare values to aggregate
   // cooling
-  Real delta_e_mesh = 0.0;
   Real delta_e_tot;
+  Real Average_T;
+  Real m[3] = {0}, gm[3];
   Real vol_tot  = pmb->pmy_mesh->ruser_mesh_data[4](1);
   Real vol_cell = pmb->pmy_mesh->ruser_mesh_data[4](2);
  
@@ -569,7 +571,9 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
                 / (2.0 * cons_local(IDN,k,j,i));
             Real delta_e = std::min(edot_cool * dt, u);
             user_out_var_local(0,k,j,i) = edot_cool;
-            delta_e_mesh += delta_e * vol_cell;
+            m[0] += delta_e * vol_cell;
+            m[1] += Interpolate2D(temperature_table, rho_index, pgas_index, rho_fraction, pgas_fraction);
+            m[2] += 1.0;
           }
         }
       }
@@ -580,10 +584,19 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
       pblock = pblock->next;
     }
 #ifdef MPI_PARALLEL
-    MPI_Allreduce(&delta_e_mesh, &delta_e_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(m, gm, 3, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
-    delta_e_tot = delta_e_mesh;
+    gm[0] = m[0];
+    gm[1] = m[1];
+    gm[2] = m[2];
 #endif
+    delta_e_tot = gm[0];
+    Average_T = gm[1]/gm[2];
+  }
+
+  // determine if cooling should start
+  if ((not cooling_on) and (Average_T > T_cool_start)){
+    cooling_on = true;
   }
 
   // Store or extract redistributed heating
@@ -676,7 +689,7 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
         delta_e = std::max(delta_e, -u);
-        if (t > t_cool_start){
+        if (cooling_on){
           e += delta_e;
         }
         if (stage == 2) {
@@ -698,6 +711,7 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
   }
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
   pmb->ruser_meshblock_data[0](1) += delta_e_ceil;
+  pmb->ruser_meshblock_data[0](2) = Average_T;
 
   // Free arrays
   rho_table.DeleteAthenaArray();
@@ -735,6 +749,7 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
 //   cooling mechanisms are:
 //     0: physical radiative losses
 //     1: numerical temperature ceiling
+//     2: average temperature
 
 Real CoolingLosses(MeshBlock *pmb, int iout)
 {
