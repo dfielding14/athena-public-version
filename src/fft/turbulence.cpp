@@ -162,9 +162,11 @@ void TurbulenceDriver::Generate(void) {
   Mesh *pm=pmy_mesh_;
   FFTBlock *pfb = pmy_fb;
   AthenaFFTPlan *plan = pfb->bplan_;
+  AthenaFFTIndex *idx = pfb->b_in_;
 
   int nbs=nslist_[Globals::my_rank];
   int nbe=nbs+nblist_[Globals::my_rank]-1;
+  int knx1=pfb->knx[0],knx2=pfb->knx[1],knx3=pfb->knx[2];
 
   if (tcorr == 0.0){ // original
     for (int nv=0; nv<3; nv++) {
@@ -191,7 +193,7 @@ void TurbulenceDriver::Generate(void) {
             }
           }
         }
-        Project(fv_solenoidal_, 1) // delete the compressive part 
+        Project(fv_solenoidal_, 1); // delete the compressive part 
         PowerSpectrum(fv);
         for (int k=0; k<knx3; k++) {
           for (int j=0; j<knx2; j++) {
@@ -203,7 +205,7 @@ void TurbulenceDriver::Generate(void) {
             }
           }
         }
-        Project(fv_compressive_, 0) // delete the solenoidal part
+        Project(fv_compressive_, 0); // delete the solenoidal part
         for (int k=0; k<knx3; k++) {
           for (int j=0; j<knx2; j++) {
             for (int i=0; i<knx1; i++) {
