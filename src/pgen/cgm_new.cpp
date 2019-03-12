@@ -598,6 +598,9 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
   // determine if cooling should start
   if ((not cooling_on) and (Average_T > T_cool_start)){
     cooling_on = true;
+    if(Globals::my_rank==0) {
+      std::cout << "Time to start cooling!! Average_T = " << Average_T << "\n";
+    }
   }
 
   // Store or extract redistributed heating
