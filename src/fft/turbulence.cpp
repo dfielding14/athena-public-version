@@ -252,7 +252,7 @@ void TurbulenceDriver::Generate(void) {
             }
           }
         }
-        Project(fv_solenoidal_, 1) // delete the compressive part 
+        Project(fv_solenoidal_, 1); // delete the compressive part 
         PowerSpectrum(fv);
         for (int k=0; k<knx3; k++) {
           for (int j=0; j<knx2; j++) {
@@ -264,7 +264,7 @@ void TurbulenceDriver::Generate(void) {
             }
           }
         }
-        Project(fv_compressive_, 0) // delete the solenoidal part
+        Project(fv_compressive_, 0); // delete the solenoidal part
         for (int k=0; k<knx3; k++) {
           for (int j=0; j<knx2; j++) {
             for (int i=0; i<knx1; i++) {
