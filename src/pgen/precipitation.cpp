@@ -26,8 +26,7 @@
 // Declarations
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage);
-Real CoolingLosses(MeshBlock *pmb, int iout);
-Real fluxes(MeshBlock *pmb, int iout);
+Real history(MeshBlock *pmb, int iout);
 static void FindIndex(const AthenaArray<double> &array, Real value, int *p_index,
     Real *p_fraction);
 static Real Interpolate1D(const AthenaArray<double> &table, int i, Real f);
@@ -435,37 +434,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
  
   // Enroll user-defined functions
   EnrollUserExplicitSourceFunction(SourceFunction);
-  AllocateUserHistoryOutput(30);
-  EnrollUserHistoryOutput(0 , CoolingLosses, "e_cool");
-  EnrollUserHistoryOutput(1 , CoolingLosses, "e_ceil");
-  EnrollUserHistoryOutput(2 , fluxes, "Migal");
-  EnrollUserHistoryOutput(3 , fluxes, "Mi01");
-  EnrollUserHistoryOutput(4 , fluxes, "Mi025");
-  EnrollUserHistoryOutput(5 , fluxes, "Mi05");
-  EnrollUserHistoryOutput(6 , fluxes, "Mi10");
-  EnrollUserHistoryOutput(7 , fluxes, "Mi15");
-  EnrollUserHistoryOutput(8 , fluxes, "Mita");
-  EnrollUserHistoryOutput(9 , fluxes, "Mogal");
-  EnrollUserHistoryOutput(10, fluxes, "Mo01");
-  EnrollUserHistoryOutput(11, fluxes, "Mo025");
-  EnrollUserHistoryOutput(12, fluxes, "Mo05");
-  EnrollUserHistoryOutput(13, fluxes, "Mo10");
-  EnrollUserHistoryOutput(14, fluxes, "Mo15");
-  EnrollUserHistoryOutput(15, fluxes, "Mota");
-  EnrollUserHistoryOutput(16, fluxes, "Eigal");
-  EnrollUserHistoryOutput(17, fluxes, "Ei01");
-  EnrollUserHistoryOutput(18, fluxes, "Ei025");
-  EnrollUserHistoryOutput(19, fluxes, "Ei05");
-  EnrollUserHistoryOutput(20, fluxes, "Ei10");
-  EnrollUserHistoryOutput(21, fluxes, "Ei15");
-  EnrollUserHistoryOutput(22, fluxes, "Eita");
-  EnrollUserHistoryOutput(23, fluxes, "Eogal");
-  EnrollUserHistoryOutput(24, fluxes, "Eo01");
-  EnrollUserHistoryOutput(25, fluxes, "Eo025");
-  EnrollUserHistoryOutput(26, fluxes, "Eo05");
-  EnrollUserHistoryOutput(27, fluxes, "Eo10");
-  EnrollUserHistoryOutput(28, fluxes, "Eo15");
-  EnrollUserHistoryOutput(29, fluxes, "Eota");
+  AllocateUserHistoryOutput(4);
+  EnrollUserHistoryOutput(0 , history, "e_cool");
+  EnrollUserHistoryOutput(1 , history, "e_ceil");
+  EnrollUserHistoryOutput(2 , history, "Migal");
+  EnrollUserHistoryOutput(3 , history, "Mogal");
   
   // Enroll user-defined time step constraint
   EnrollUserTimeStepFunction(cooling_timestep);
@@ -494,16 +467,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   // Allocate storage for keeping track of cooling
-  AllocateRealUserMeshBlockDataField(2);
-  ruser_meshblock_data[0].NewAthenaArray(2);
-  ruser_meshblock_data[0](0) = 0.0;
-  ruser_meshblock_data[0](1) = 0.0;
+  AllocateRealUserMeshBlockDataField(1);
+  ruser_meshblock_data[0].NewAthenaArray(4);
+  ruser_meshblock_data[0](0) = 0.0; // edot cool
+  ruser_meshblock_data[0](1) = 0.0; // edot ceiling
+  ruser_meshblock_data[0](2) = 0.0; // mdot in 
+  ruser_meshblock_data[0](3) = 0.0; // mdot out 
   
-  // Allocate storage for keeping track of fluxes
-  ruser_meshblock_data[1].NewAthenaArray(28);
-  for (int i = 0; i < 28; ++i) {
-    ruser_meshblock_data[1](i) = 0.0; 
-  }
 
   // Set output variables
   AllocateUserOutputVariables(2);
@@ -573,11 +543,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   // Initialize conserved values
   peos->PrimitiveToConserved(phydro->w, bb, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   bb.DeleteAthenaArray();
-
-  if(Globals::my_rank==0) {
-    std::cout << " problem generated \n";
-  }
-
   return;
 }
 
@@ -697,13 +662,9 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         for (int j = js; j <= je; ++j) {
           for (int i = is; i <= ie; ++i) {
             Real r = pblock->pcoord->x1v(i);
-            // Extract density, pressure, vr
+            // Extract density, pressure
             Real rho  = prim_local(IDN,k,j,i);
             Real pgas = prim_local(IPR,k,j,i);
-            Real vr   = prim_local(IVX,k,j,i);
-            Real vth  = prim_local(IVY,k,j,i);
-            Real vph  = prim_local(IVZ,k,j,i);
-
             // Locate density and pressure in table
             int rho_index;
             Real rho_fraction;
@@ -725,66 +686,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             //                 * (pow(pcoord->x1f(i+1),3) - pow(pcoord->x1f(i),3))/3.;
             Real vol_cell = pmb->pcoord->GetCellVolume(k,j,i);
             delta_e_mesh += delta_e * vol_cell;
-            // calculate mass flux and place in appropriate holder
-            Real mdot = pblock->pcoord->GetFace1Area(k,j,i)*rho*vr;
-            Real edot = mdot * (0.5*(SQR(vr)+SQR(vth)+SQR(vph)) + gamma_adi/(gamma_adi-1.0) * pgas/rho + (phi_ta - grav_pot(r)));
-            if (pblock->pcoord->x1f(i) == r_inner){
-              if (vr<0.){
-                flux_mesh[0]  += mdot;
-                flux_mesh[14] += edot;
-              } else {
-                flux_mesh[7]  += mdot;
-                flux_mesh[21] += edot;
-              }
-            } else if ( ( r/rvir < 0.10 ) and ( 0.10 - r/rvir < pblock->pcoord->dx1v(i))){
-              if (vr<0.){
-                flux_mesh[1]  += mdot;
-                flux_mesh[15] += edot;
-              } else {
-                flux_mesh[8]  += mdot;
-                flux_mesh[22] += edot;
-              }
-            } else if ( ( r/rvir < 0.25 ) and ( 0.25 - r/rvir < pblock->pcoord->dx1v(i))){
-              if (vr<0.){
-                flux_mesh[2]  += mdot;
-                flux_mesh[16] += edot;
-              } else {
-                flux_mesh[9]  += mdot;
-                flux_mesh[23] += edot;
-              }
-            } else if ( ( r/rvir < 0.50 ) and ( 0.50 - r/rvir < pblock->pcoord->dx1v(i))){
-              if (vr<0.){
-                flux_mesh[3]  += mdot;
-                flux_mesh[17] += edot;
-              } else {
-                flux_mesh[10]  += mdot;
-                flux_mesh[24] += edot;
-              }
-            } else if ( ( r/rvir < 1.00 ) and ( 1.00 - r/rvir < pblock->pcoord->dx1v(i))){
-              if (vr<0.){
-                flux_mesh[4]  += mdot;
-                flux_mesh[18] += edot;
-              } else {
-                flux_mesh[11]  += mdot;
-                flux_mesh[25] += edot;
-              }
-            } else if ( ( r/rvir < 1.50 ) and ( 1.50 - r/rvir < pblock->pcoord->dx1v(i))){
-              if (vr<0.){
-                flux_mesh[5]  += mdot;
-                flux_mesh[19] += edot;
-              } else {
-                flux_mesh[12]  += mdot;
-                flux_mesh[26] += edot;
-              }
-            } else if ( pblock->pcoord->x1f(i+1) == r_outer ){
-              if (vr<0.){
-                flux_mesh[6]  += mdot;
-                flux_mesh[20] += edot;
-              } else {
-                flux_mesh[13]  += mdot;
-                flux_mesh[27] += edot;
-              }
-            }
           }
         }
       }
@@ -796,10 +697,8 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     }
 #ifdef MPI_PARALLEL
     MPI_Allreduce(&delta_e_mesh, &delta_e_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(&flux_mesh, &flux_tot, 28, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
     delta_e_tot = delta_e_mesh;
-    flux_tot = flux_mesh;
 #endif
   }
 
@@ -810,17 +709,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     delta_e_tot = pmb->pmy_mesh->ruser_mesh_data[4](0);
   }
   
-  // Store or extract flux
-  if (pmb->lid == 0) {
-    for (int i = 0; i < 28; ++i) {
-      pmb->ruser_meshblock_data[1](i) = flux_tot[i];
-    }
-  } else {
-    for (int i = 0; i < 28; ++i) {
-      flux_tot[i] = pmb->ruser_meshblock_data[1](i);
-    }
-  }
-
   // Extract indices
   int is = pmb->is;
   int ie = pmb->ie;
@@ -837,6 +725,8 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   // Apply all source terms
   Real delta_e_block = 0.0;
   Real delta_e_ceil = 0.0;
+  Real mdot_in = 0.0;
+  Real mdot_out = 0.0;
   for (int k = ks; k <= ke; ++k) {
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
@@ -849,6 +739,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         Real &m1 = cons(IM1,k,j,i);
         Real &m2 = cons(IM2,k,j,i);
         Real &m3 = cons(IM3,k,j,i);
+        Real vr   = prim_local(IVX,k,j,i);
 
         // Locate density and pressure in table
         int rho_index;
@@ -898,11 +789,20 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             delta_e_ceil += (u - u_max);
           }
         }
+        if (pblock->pcoord->x1f(i) == r_inner){
+          if (vr<0.){
+            mdot_in  += pblock->pcoord->GetFace1Area(k,j,i)*rho*vr;
+          } else {
+            mdot_out += pblock->pcoord->GetFace1Area(k,j,i)*rho*vr;
+          }
+        } 
       }
     }
   }
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
   pmb->ruser_meshblock_data[0](1) += delta_e_ceil;
+  pmb->ruser_meshblock_data[0](2) += mdot_in;
+  pmb->ruser_meshblock_data[0](3) += mdot_out;
 
   // Free arrays
   rho_table.DeleteAthenaArray();
@@ -927,33 +827,14 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 //   cooling mechanisms are:
 //     0: physical radiative losses
 //     1: numerical temperature ceiling
+//     2: inward  mass flux through inner boundary
+//     3: outward mass flux through inner boundary
 
-Real CoolingLosses(MeshBlock *pmb, int iout)
+Real history(MeshBlock *pmb, int iout)
 {
   Real delta_e = pmb->ruser_meshblock_data[0](iout);
   pmb->ruser_meshblock_data[0](iout) = 0.0;
   return delta_e;
-}
-
-
-
-//----------------------------------------------------------------------------------------
-// fluxes
-// Inputs:
-//   pmb: pointer to MeshBlock
-//   iout: index of history output
-// Outputs:
-//   returned value: mass fluxes at inner edge, 0.1, 0.25, 0.5, 1.0, 1.5, and outer edge
-
-Real fluxes(MeshBlock *pmb, int iout)
-{
-  if(Globals::my_rank==0){
-    Real flux = pmb->ruser_meshblock_data[1](iout-2);
-    pmb->ruser_meshblock_data[1](iout-2) = 0.0;
-    return flux;
-  } else {
-    return 0;
-  }
 }
 
 
@@ -1278,7 +1159,7 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   area = SQR(pmb->pmy_mesh->mesh_size.x1min)
           * (pmb->pmy_mesh->mesh_size.x3max - pmb->pmy_mesh->mesh_size.x3min)
           * 2.0*(1 - std::cos(opening_angle)); // area = r^2 dphi 2*(cos0 - cos theta)
-  rho_out = -1.0*pmb->ruser_meshblock_data[1](0)/area/v_wind * (eta/(1.0+eta));
+  rho_out = -1.0*pmb->ruser_meshblock_data[0](2)/area/v_wind * (eta/(1.0+eta));
 
   // if(Globals::my_rank==0) {
   std::cout << " mdot = " << pmb->ruser_meshblock_data[1](0) << " rho_out = " << rho_out << " area = " << area << "\n";
