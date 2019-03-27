@@ -1162,14 +1162,14 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   rho_out = -1.0*pmb->ruser_meshblock_data[0](2)/area/v_wind * (eta/(1.0+eta));
 
   // if(Globals::my_rank==0) {
-  std::cout << " mdot = " << pmb->ruser_meshblock_data[0](2) << " rho_out = " << rho_out << " area = " << area << "\n";
+  // std::cout << " mdot = " << pmb->ruser_meshblock_data[0](2) << " rho_out = " << rho_out << " area = " << area << "\n";
   // }
 
   if (rho_out > 0.0) {
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         Real theta = pco->x2v(j);
-        std::cout << " theta = " << theta << " PI-theta = " << PI-theta << "\n";
+        // std::cout << " theta = " << theta << " PI-theta = " << PI-theta << "\n";
         if ((theta <= opening_angle) || ((PI-theta) <= opening_angle)){
           for (int i=1; i<=(NGHOST); ++i) {
             prim(IDN,k,j,is-i) = rho_out;
