@@ -613,7 +613,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   // Apply all source terms
   Real delta_e_block = 0.0;
   Real delta_e_ceil = 0.0;
-  Real m[2] = {0}, gm[2];
+  Real mdot_local[2] = {0}, mdot_global[2];
   for (int k = ks; k <= ke; ++k) {
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
