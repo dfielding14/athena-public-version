@@ -1288,7 +1288,7 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         Real theta = pco->x2v(j);
-        if ((theta <= opening_angle) or (PI-theta <= opening_angle)){
+        if ((theta <= opening_angle) || ((PI-theta) <= opening_angle)){
           for (int i=1; i<=(NGHOST); ++i) {
             prim(IDN,k,j,is-i) = rho_out;
             prim(IVX,k,j,is-i) = v_wind;
