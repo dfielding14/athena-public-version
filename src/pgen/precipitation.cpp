@@ -706,8 +706,8 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
   pmb->ruser_meshblock_data[0](1) += delta_e_ceil;
-  pmb->ruser_meshblock_data[0](2) += mdot_global[0];
-  pmb->ruser_meshblock_data[0](3) += mdot_global[1];
+  pmb->ruser_meshblock_data[0](2) = mdot_global[0];
+  pmb->ruser_meshblock_data[0](3) = mdot_global[1];
 
   // Free arrays
   rho_table.DeleteAthenaArray();
@@ -739,8 +739,12 @@ Real history(MeshBlock *pmb, int iout)
 {
   Real stored_parameter = pmb->ruser_meshblock_data[0](iout);
   pmb->ruser_meshblock_data[0](iout) = 0.0;
-  if (iout < 2) return stored_parameter;
-  else return stored_parameter/pmb->pmy_mesh->nbtotal // these are summed over in the hist output so I have to normalize by the number of meshblocks
+  if (iout < 2) {
+    return stored_parameter;
+  }
+  else {
+    return stored_parameter/pmb->pmy_mesh->nbtotal; // these are summed over in the hist output so I have to normalize by the number of meshblocks
+  }
 }
 
 
