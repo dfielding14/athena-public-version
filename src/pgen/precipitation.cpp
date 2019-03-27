@@ -44,22 +44,15 @@ static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
 static Real pgas_table_min, pgas_table_max, pgas_table_n;
 static Real t_cool_start;
-static bool heat_redistribute, constant_energy;
-static bool adaptive_driving, tophat_driving;
-static Real drive_duration, drive_separation, dedt_on;
 static Real beta;
 static Real grav_scale_inner, aaa, rs_rt, rhom, rho0;
 
 static Real cooling_timestep(MeshBlock *pmb);
-static int turb_grid_size;
-static Real kappa;
-static bool conduction_on;
 static Real dt_cutoff, cfl_cool;
 static Real pfloor, dfloor, vceil;
 
 static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
-static Real rho_wind, v_wind, cs_wind, eta;
-static Real rho_igm, v_igm, cs_igm, Mdot_igm;
+static Real rho_wind, v_wind, cs_wind, eta, opening_angle;
 static Real cs, rho_ta, f_cs;
 
 static Real r_inner, r_outer;
@@ -160,6 +153,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real T_wind   = pin->GetOrAddReal("problem", "T_wind", 1.0e4);
   cs_wind       = sqrt(kb*T_wind/(0.62*mp))/vel_scale;
   eta           = pin->GetOrAddReal("problem", "eta", 0.0);
+  opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
 
   // Gravity
   Mhalo        = pin->GetReal("problem", "Mhalo"); // in Msun
@@ -589,9 +583,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
 
 //----------------------------------------------------------------------------------------
-// Function to calculate the timestep required to resolve cooling (and later conduction)
+// Function to calculate the timestep required to resolve cooling 
 //          tcool = 3/2 P/Edot_cool
-//          tcond = (dx)^2 / kappa (?)
 // Inputs:
 //   pmb: pointer to MeshBlock
 Real cooling_timestep(MeshBlock *pmb)
@@ -610,19 +603,7 @@ Real cooling_timestep(MeshBlock *pmb)
             Real dt;
             Real edot = fabs(edot_cool(k,j,i));
             Real press = pmb->phydro->w(IPR,k,j,i);
-            if (conduction_on){
-              dt = cfl_cool * std::min( SQR(pmb->pcoord->dx1f(i))/kappa , 1.5*press/edot); // experiment with that cfl_cool
-            } else {
-              dt = cfl_cool * 1.5*press/edot;
-            }
-            // if (dt < dt_cutoff){
-            //   Real r = pmb->pcoord->x1v(i);
-            //   Real theta = pmb->pcoord->x1v(j);
-            //   Real phi = pmb->pcoord->x1v(k);
-            //   std::cout << " dt_cutoff > dt = " << dt << " press "<< press << " temperature "<< temperature(k,j,i)  << 
-            //                " density " << pmb->phydro->w(IDN,k,j,i)  << " edot "<< edot <<
-            //                " r " << r  << " theta "<< theta << " phi "<< phi <<"\n";
-            // }
+            dt = cfl_cool * 1.5*press/edot;
             dt = std::max( dt , dt_cutoff );
             min_dt = std::min(min_dt, dt);
           }
@@ -1306,17 +1287,28 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   if (rho_out > 0.0) {
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
-        for (int i=1; i<=(NGHOST); ++i) {
-          prim(IDN,k,j,is-i) = rho_out;
-          prim(IVX,k,j,is-i) = v_wind;
-          prim(IVY,k,j,is-i) = 0.0;
-          prim(IVZ,k,j,is-i) = 0.0;
-          prim(IPR,k,j,is-i) = rho_out*SQR(cs_wind);
+        Real theta = pcoord->x2v(j);
+        if ((theta <= opening_angle) or (PI-theta <= opening_angle)){
+          for (int i=1; i<=(NGHOST); ++i) {
+            prim(IDN,k,j,is-i) = rho_out;
+            prim(IVX,k,j,is-i) = v_wind;
+            prim(IVY,k,j,is-i) = 0.0;
+            prim(IVZ,k,j,is-i) = 0.0;
+            prim(IPR,k,j,is-i) = rho_out*SQR(cs_wind);
 #if MAGNETIC_FIELDS_ENABLED
-          b.x1f(k,j,is-i) = 0.0;
-          b.x2f(k,j,is-i) = 0.0;
-          b.x3f(k,j,is-i) = sqrt(8*PI*rho_out*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+            b.x1f(k,j,is-i) = 0.0;
+            b.x2f(k,j,is-i) = 0.0;
+            b.x3f(k,j,is-i) = 0.0;// sqrt(8*PI*rho_out*SQR(cs_wind)/beta); // need to be VERY careful about how to add magnetic fields beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta ) but in code units I think there is a 4 pi 
 #endif
+          }
+        } else {
+          for (int n=0; n<(NHYDRO); ++n) {
+            for (int i=1; i<=(NGHOST); ++i) {
+              Real fp = prim(n,k,j,is) - prim(n,k,j,is+1);
+              Real fpp = prim(n,k,j,is) - 2*prim(n,k,j,is+1) + prim(n,k,j,is+2);
+              prim(n,k,j,is-i) = prim(n,k,j,is) + i*fp + 0.5*SQR(i)*fpp;
+            }  
+          }
         }
       }
     }
