@@ -711,7 +711,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   pmb->ruser_meshblock_data[0](3) = mdot_global[1];
   Mdot_in = mdot_global[0];
   Mdot_out = mdot_global[1];
-
+  std::cout << " mdot = " << Mdot_in << "\n";
 
   // Free arrays
   rho_table.DeleteAthenaArray();
