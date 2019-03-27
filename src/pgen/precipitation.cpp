@@ -735,11 +735,11 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         const Real &rho_half = prim(IDN,k,j,i);
         const Real &pgas_half = prim(IPR,k,j,i);
         const Real &rho = cons(IDN,k,j,i);
+        const Real &vr = prim(IVX,k,j,i);
         Real &e = cons(IEN,k,j,i);
         Real &m1 = cons(IM1,k,j,i);
         Real &m2 = cons(IM2,k,j,i);
         Real &m3 = cons(IM3,k,j,i);
-        Real vr   = prim_local(IVX,k,j,i);
 
         // Locate density and pressure in table
         int rho_index;
@@ -785,15 +785,15 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           e = kinetic + u_max;
           if (MAGNETIC_FIELDS_ENABLED) e += magnetic;
           if (stage == 2) {
-            Real vol_cell = pmb->pcoord->GetCellVolume(k,j,i);
+            // Real vol_cell = pmb->pcoord->GetCellVolume(k,j,i);
             delta_e_ceil += (u - u_max);
           }
         }
-        if (pblock->pcoord->x1f(i) == r_inner){
+        if (pmb->pcoord->x1f(i) == r_inner){
           if (vr<0.){
-            mdot_in  += pblock->pcoord->GetFace1Area(k,j,i)*rho*vr;
+            mdot_in  += pmb->pcoord->GetFace1Area(k,j,i)*rho*vr;
           } else {
-            mdot_out += pblock->pcoord->GetFace1Area(k,j,i)*rho*vr;
+            mdot_out += pmb->pcoord->GetFace1Area(k,j,i)*rho*vr;
           }
         } 
       }
