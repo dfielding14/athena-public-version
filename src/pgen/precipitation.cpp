@@ -1277,7 +1277,7 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   Real rho_out, area;
   area = SQR(pmb->pmy_mesh->mesh_size.x1min)
           * (pmb->pmy_mesh->mesh_size.x3max - pmb->pmy_mesh->mesh_size.x3min)
-          * (std::cos(pmb->pmy_mesh->mesh_size.x2min) - std::cos(pmb->pmy_mesh->mesh_size.x2max)); // area = r^2 dphi dcostheta
+          * 2.0*(1 - std::cos(opening_angle)); // area = r^2 dphi 2*(cos0 - cos theta)
   rho_out = -1.0*pmb->ruser_meshblock_data[1](0)/area/v_wind * (eta/(1.0+eta));
 
   // if(Globals::my_rank==0) {
