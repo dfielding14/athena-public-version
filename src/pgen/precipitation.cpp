@@ -53,6 +53,7 @@ static Real pfloor, dfloor, vceil;
 static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta, opening_angle;
 static Real cs, rho_ta, f_cs;
+static Real Mdot_in, Mdot_out;
 
 static Real r_inner, r_outer;
 
@@ -698,16 +699,19 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   }
 
 #ifdef MPI_PARALLEL
-    MPI_Allreduce(mdot_local, mdot_global, 2, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(mdot_local, mdot_global, 2, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
-    mdot_global[0] = mdot_local[0];
-    mdot_global[1] = mdot_local[1];
+  mdot_global[0] = mdot_local[0];
+  mdot_global[1] = mdot_local[1];
 #endif
 
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
   pmb->ruser_meshblock_data[0](1) += delta_e_ceil;
   pmb->ruser_meshblock_data[0](2) = mdot_global[0];
   pmb->ruser_meshblock_data[0](3) = mdot_global[1];
+  Mdot_in = mdot_global[0];
+  Mdot_out = mdot_global[1];
+
 
   // Free arrays
   rho_table.DeleteAthenaArray();
@@ -1069,10 +1073,10 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   area = SQR(pmb->pmy_mesh->mesh_size.x1min)
           * (pmb->pmy_mesh->mesh_size.x3max - pmb->pmy_mesh->mesh_size.x3min)
           * 2.0*(1 - std::cos(opening_angle)); // area = r^2 dphi 2*(cos0 - cos theta)
-  rho_out = -1.0*pmb->ruser_meshblock_data[0](2)/area/v_wind * (eta/(1.0+eta));
+  rho_out = -1.0*Mdot_in/area/v_wind * (eta/(1.0+eta));
 
   // if(Globals::my_rank==0) {
-  // std::cout << " mdot = " << pmb->ruser_meshblock_data[0](2) << " rho_out = " << rho_out << " area = " << area << "\n";
+  // std::cout << " mdot = " << Mdot_in << " rho_out = " << rho_out << " area = " << area << "\n";
   // }
 
   if (rho_out > 0.0) {
@@ -1082,7 +1086,7 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         // std::cout << " theta = " << theta << " PI-theta = " << PI-theta << "\n";
         if ((theta <= opening_angle) || ((PI-theta) <= opening_angle)){
           for (int i=1; i<=(NGHOST); ++i) {
-            // std::cout << " mdot = " << pmb->ruser_meshblock_data[0](2) << "\n";
+            std::cout << " mdot = " << Mdot_in << "\n";
             prim(IDN,k,j,is-i) = rho_out;
             prim(IVX,k,j,is-i) = v_wind;
             prim(IVY,k,j,is-i) = 0.0;
