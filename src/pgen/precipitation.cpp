@@ -335,19 +335,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   H5Fclose(file);
 
   // Allocate fixed cooling table
-  AllocateRealUserMeshDataField(5);
+  AllocateRealUserMeshDataField(4);
   ruser_mesh_data[0].NewAthenaArray(rho_table_n);
   ruser_mesh_data[1].NewAthenaArray(pgas_table_n);
   ruser_mesh_data[2].NewAthenaArray(rho_table_n, pgas_table_n);
   ruser_mesh_data[3].NewAthenaArray(rho_table_n, pgas_table_n);
-  ruser_mesh_data[4].NewAthenaArray(2); // delta_e_tot, vol_tot
-
-  Real vol_tot = (mesh_size.x3max - mesh_size.x3min)
-                 * (std::cos(mesh_size.x2max) - std::cos(mesh_size.x2min))
-                 * (pow(mesh_size.x1max,3) - pow(mesh_size.x1min,3))/3.;
-  ruser_mesh_data[4](1) = vol_tot;
-
-
 
   // Tabulate sample points
   for (int i = 0; i < rho_table_n; ++i) {
@@ -507,7 +499,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   }
 
 
-  Real phi_ta = fabs(grav_pot(r_outer));
   Real vc_ta  = sqrt( grav_accel(r_outer) * r_outer );
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
@@ -599,116 +590,6 @@ Real cooling_timestep(MeshBlock *pmb)
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
 {
-  // Prepare values to aggregate
-  // cooling
-  Real delta_e_mesh = 0.0;
-  Real delta_e_tot;
-  Real vol_tot  = pmb->pmy_mesh->ruser_mesh_data[4](1);
-  // mass fluxes
-  Real flux_mesh[28] = {0.0};
-  Real flux_tot[28] = {0.0};
-
-  // gravity 
-  for (int k=pmb->ks; k<=pmb->ke; ++k) {
-    for (int j=pmb->js; j<=pmb->je; ++j) {
-      for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real r = pmb->pcoord->x1v(i);
-        Real delta_vr = dt*grav_accel(r);
-        cons(IM1,k,j,i) -= prim(IDN,k,j,i) * delta_vr;
-        if (NON_BAROTROPIC_EOS) cons(IEN,k,j,i) -= 0.5*prim(IDN,k,j,i)*(2.*delta_vr*prim(IVX,k,j,i) - SQR(delta_vr));
-      }
-    }
-  }
-
-
-  // Extract data tables
-  AthenaArray<Real> rho_table, pgas_table, edot_cool_table, temperature_table;
-  rho_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[0]);
-  pgas_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[1]);
-  edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
-  temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
-  
-  Real phi_ta = grav_pot(r_outer);
-
-  // Calculate cooling on all blocks
-  if (pmb->lid == 0) {
-
-    // Go through all blocks on mesh
-    int num_blocks = pmb->pmy_mesh->GetNumMeshBlocksThisRank(Globals::my_rank);
-    MeshBlock *pblock = pmb;
-    for (int n = 0; n < num_blocks; ++n) {
-
-      // Extract indices
-      int is = pblock->is;
-      int ie = pblock->ie;
-      int js = pblock->js;
-      int je = pblock->je;
-      int ks = pblock->ks;
-      int ke = pblock->ke;
-
-      // Extract arrays
-      AthenaArray<Real> prim_local, cons_local, user_out_var_local;
-      if (stage == 1) {
-        prim_local.InitWithShallowCopy(pblock->phydro->w);
-        cons_local.InitWithShallowCopy(pblock->phydro->u1);
-      } else {
-        prim_local.InitWithShallowCopy(pblock->phydro->w1);
-        cons_local.InitWithShallowCopy(pblock->phydro->u);
-      }
-      user_out_var_local.InitWithShallowCopy(pblock->user_out_var);
-
-      // Calculate cooling
-      for (int k = ks; k <= ke; ++k) {
-        for (int j = js; j <= je; ++j) {
-          for (int i = is; i <= ie; ++i) {
-            Real r = pblock->pcoord->x1v(i);
-            // Extract density, pressure
-            Real rho  = prim_local(IDN,k,j,i);
-            Real pgas = prim_local(IPR,k,j,i);
-            // Locate density and pressure in table
-            int rho_index;
-            Real rho_fraction;
-            FindIndex(rho_table, rho, &rho_index, &rho_fraction);
-            int pgas_index;
-            Real pgas_fraction;
-            FindIndex(pgas_table, pgas, &pgas_index, &pgas_fraction);
-
-            // Interpolate and store cooling ------- Should this be done with RK2 or RK4????
-            Real edot_cool = Interpolate2D(edot_cool_table, rho_index, pgas_index, rho_fraction,
-                pgas_fraction);
-            Real u = cons_local(IEN,k,j,i) - (SQR(cons_local(IM1,k,j,i))
-                + SQR(cons_local(IM2,k,j,i)) + SQR(cons_local(IM3,k,j,i)))
-                / (2.0 * cons_local(IDN,k,j,i));
-            Real delta_e = std::min(edot_cool * dt, u);
-            user_out_var_local(0,k,j,i) = edot_cool;
-            // Real vol_cell = (pcoord->x3f(k+1)-pcoord->x3f(k))
-            //                 * (std::cos(pcoord->x2f(j+1)) - std::cos(pcoord->x2f(j)))
-            //                 * (pow(pcoord->x1f(i+1),3) - pow(pcoord->x1f(i),3))/3.;
-            Real vol_cell = pmb->pcoord->GetCellVolume(k,j,i);
-            delta_e_mesh += delta_e * vol_cell;
-          }
-        }
-      }
-      // Prepare for next block on mesh
-      prim_local.DeleteAthenaArray();
-      cons_local.DeleteAthenaArray();
-      user_out_var_local.DeleteAthenaArray();
-      pblock = pblock->next;
-    }
-#ifdef MPI_PARALLEL
-    MPI_Allreduce(&delta_e_mesh, &delta_e_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
-#else
-    delta_e_tot = delta_e_mesh;
-#endif
-  }
-
-  // Store or extract redistributed heating
-  if (pmb->lid == 0) {
-    pmb->pmy_mesh->ruser_mesh_data[4](0) = delta_e_tot;
-  } else {
-    delta_e_tot = pmb->pmy_mesh->ruser_mesh_data[4](0);
-  }
-  
   // Extract indices
   int is = pmb->is;
   int ie = pmb->ie;
@@ -717,6 +598,13 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   int ks = pmb->ks;
   int ke = pmb->ke;
 
+  // Extract data tables
+  AthenaArray<Real> rho_table, pgas_table, edot_cool_table, temperature_table;
+  rho_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[0]);
+  pgas_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[1]);
+  edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
+  temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
+  
   // Extract arrays
   AthenaArray<Real> edot_cool, temperature;
   edot_cool.InitWithShallowSlice(pmb->user_out_var, 4, 0, 1);
@@ -725,11 +613,15 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   // Apply all source terms
   Real delta_e_block = 0.0;
   Real delta_e_ceil = 0.0;
-  Real mdot_in = 0.0;
-  Real mdot_out = 0.0;
+  Real m[2] = {0}, gm[2];
   for (int k = ks; k <= ke; ++k) {
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
+        // gravitational acceleration
+        Real r = pmb->pcoord->x1v(i);
+        Real delta_vr = dt*grav_accel(r);
+        cons(IM1,k,j,i) -= prim(IDN,k,j,i) * delta_vr;
+        if (NON_BAROTROPIC_EOS) cons(IEN,k,j,i) -= 0.5*prim(IDN,k,j,i)*(2.*delta_vr*prim(IVX,k,j,i) - SQR(delta_vr));
 
         // Extract primitive and conserved quantities
         const Real &rho_half = prim(IDN,k,j,i);
@@ -749,8 +641,10 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         Real pgas_fraction;
         FindIndex(pgas_table, pgas_half, &pgas_index, &pgas_fraction);
 
-        // Interpolate and store temperature
+        // Interpolate and store temperature and edot_cool
         temperature(k,j,i) = Interpolate2D(temperature_table, rho_index, pgas_index,
+            rho_fraction, pgas_fraction);
+        edot_cool(k,j,i) = Interpolate2D(edot_cool_table, rho_index, pgas_index, 
             rho_fraction, pgas_fraction);
 
         // Apply cooling and heating
@@ -766,10 +660,12 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
           u -= magnetic; 
         }
+        // don't let cooling give you a negative thermal energy
         delta_e = std::max(delta_e, -u + 2.0*pfloor/(gamma_adi-1.0));
         if (t > t_cool_start){
           e += delta_e;
         }
+        // store how much energy is being removed for history file
         if (stage == 2) {
           delta_e_block += delta_e;
         }
@@ -789,20 +685,29 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             delta_e_ceil += (u - u_max);
           }
         }
+        // calculate the inward and outward mass fluxes at the inner boundary
         if (pmb->pcoord->x1f(i) == r_inner){
           if (vr<0.){
-            mdot_in  += pmb->pcoord->GetFace1Area(k,j,i)*rho*vr;
+            mdot_local[0] += pmb->pcoord->GetFace1Area(k,j,i)*rho*vr;
           } else {
-            mdot_out += pmb->pcoord->GetFace1Area(k,j,i)*rho*vr;
+            mdot_local[1] += pmb->pcoord->GetFace1Area(k,j,i)*rho*vr;
           }
         } 
       }
     }
   }
+
+#ifdef MPI_PARALLEL
+    MPI_Allreduce(mdot_local, mdot_global, 2, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+#else
+    mdot_global[0] = mdot_local[0];
+    mdot_global[1] = mdot_local[1];
+#endif
+
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
   pmb->ruser_meshblock_data[0](1) += delta_e_ceil;
-  pmb->ruser_meshblock_data[0](2) += mdot_in;
-  pmb->ruser_meshblock_data[0](3) += mdot_out;
+  pmb->ruser_meshblock_data[0](2) += mdot_global[0];
+  pmb->ruser_meshblock_data[0](3) += mdot_global[1];
 
   // Free arrays
   rho_table.DeleteAthenaArray();
@@ -832,9 +737,10 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
 Real history(MeshBlock *pmb, int iout)
 {
-  Real delta_e = pmb->ruser_meshblock_data[0](iout);
+  Real stored_parameter = pmb->ruser_meshblock_data[0](iout);
   pmb->ruser_meshblock_data[0](iout) = 0.0;
-  return delta_e;
+  if (iout < 2) return stored_parameter;
+  else return stored_parameter/pmb->pmy_mesh->nbtotal // these are summed over in the hist output so I have to normalize by the number of meshblocks
 }
 
 
