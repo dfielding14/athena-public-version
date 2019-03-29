@@ -349,7 +349,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   
   bool NonlinearMixingViscosity_on = pin->GetOrAddBoolean("problem", "NonlinearMixingViscosity_on", false);
   bool NonlinearMixingConduction_on = pin->GetOrAddBoolean("problem", "NonlinearMixingConduction_on", false);
-  grad_vel_0 = pin->GetOrAddReal("problem", "grad_vel_0", FLT_MAX); // normalization for the velocity gradient
+  grad_vel_0 = pin->GetOrAddReal("problem", "grad_vel_0", 1e10); // normalization for the velocity gradient
 
   if (NonlinearMixingViscosity_on)  EnrollViscosityCoefficient(NonlinearMixingViscosity);
   if (NonlinearMixingConduction_on)  EnrollConductionCoefficient(NonlinearMixingConduction);
@@ -770,17 +770,6 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
 
 
 
-
-
-
-
-dvel2_dx1*dvel2_dx1 + dvel3_dx1*dvel3_dx1 + dvel1_dx2*dvel1_dx2 + dvel3_dx2*dvel3_dx2 + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3
-
-
-
-
-
-
 // ----------------------------------------------------------------------------------------
 // Nonlinear Mixing Viscosity 
 // nu = nu_0 * (grad v) / grad_vel_0
@@ -793,7 +782,6 @@ void NonlinearMixingViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const Athen
 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-#pragma omp simd
       for (int i=is; i<=ie; ++i){
 
         dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
@@ -826,7 +814,6 @@ void NonlinearMixingConduction(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-#pragma omp simd
       for (int i=is; i<=ie; ++i){
 
         dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
