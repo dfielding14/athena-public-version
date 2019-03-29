@@ -775,8 +775,8 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
 // nu = nu_0 * (grad v) / grad_vel_0
 
 void NonlinearMixingViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
-     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
   Real dvel2_dx1, dvel3_dx1, dvel1_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3;
   Real grad_vel;
 
@@ -807,8 +807,8 @@ void NonlinearMixingViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const Athen
 // kappa = kappa_0 * (grad v) / grad_vel_0
 
 void NonlinearMixingConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
-     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) {
-
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
   Real dvel2_dx1, dvel3_dx1, dvel1_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3;
   Real grad_vel;
 
