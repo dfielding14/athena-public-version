@@ -626,7 +626,13 @@ void Cooling_Conduction_TurbDriving(MeshBlock *pmb, const Real t, const Real dt,
   }
 
   if (adaptive_driving) {
-    dedt = std::max(delta_e_tot / dt, 0.0);
+    if (cooling_on){
+      dedt = std::max(delta_e_tot / dt, 0.0);
+    } else if (dedt_on>=0.0){
+      dedt = dedt_on;
+    } else {
+      dedt = 0.0; // edot of gas once it has reached the target temperature. 
+    }
     if(Globals::my_rank==0) {
       std::cout << "adaptive_driving dedt " << dedt << "\n";
     }

@@ -586,7 +586,6 @@ Real cooling_timestep(MeshBlock *pmb)
 //   writes to user_out_var array the following quantities:
 //     0: edot_cool
 //     1: T
-//     3: edot_cond
 
 void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
@@ -1078,6 +1077,8 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   // if(Globals::my_rank==0) {
   // std::cout << " mdot = " << Mdot_in << " rho_out = " << rho_out << " area = " << area << "\n";
   // }
+
+  // Maybe I can just calculate the Mdot here... or in user after work
 
   if (rho_out > 0.0) {
     for (int k=ks; k<=ke; ++k) {
