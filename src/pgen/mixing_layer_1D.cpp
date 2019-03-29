@@ -351,8 +351,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   bool NonlinearMixingConduction_on = pin->GetOrAddBoolean("problem", "NonlinearMixingConduction_on", false);
   grad_vel_0 = pin->GetOrAddReal("problem", "grad_vel_0", 1e10); // normalization for the velocity gradient
 
-  if (NonlinearMixingViscosity_on)  EnrollViscosityCoefficient(NonlinearMixingViscosity);
-  if (NonlinearMixingConduction_on)  EnrollConductionCoefficient(NonlinearMixingConduction);
+  if (NonlinearMixingViscosity_on){
+    EnrollViscosityCoefficient(NonlinearMixingViscosity);
+  }
+  if (NonlinearMixingConduction_on){
+    EnrollConductionCoefficient(NonlinearMixingConduction);
+  }
 
 
   return;
