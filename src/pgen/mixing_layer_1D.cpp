@@ -783,25 +783,26 @@ void NonlinearMixingViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const Athen
 {
   Real dvel2_dx1, dvel3_dx1, dvel1_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3;
   Real grad_vel;
+  if (phdif->nu_iso > 0.0) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
 
-  for (int k=ks; k<=ke; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
+          dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+          dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
 
-        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
-        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+          dvel1_dx2 = (prim(IVX,k,j,i) - prim(IVX,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+          dvel3_dx2 = (prim(IVZ,k,j,i) - prim(IVZ,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
 
-        dvel1_dx2 = (prim(IVX,k,j,i) - prim(IVX,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
-        dvel3_dx2 = (prim(IVZ,k,j,i) - prim(IVZ,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+          dvel1_dx3 = (prim(IVX,k,j,i) - prim(IVX,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+          dvel2_dx3 = (prim(IVY,k,j,i) - prim(IVY,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
 
-        dvel1_dx3 = (prim(IVX,k,j,i) - prim(IVX,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
-        dvel2_dx3 = (prim(IVY,k,j,i) - prim(IVY,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+          grad_vel = sqrt(dvel2_dx1*dvel2_dx1 + dvel3_dx1*dvel3_dx1 
+                        + dvel1_dx2*dvel1_dx2 + dvel3_dx2*dvel3_dx2 
+                        + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3);
 
-        grad_vel = sqrt(dvel2_dx1*dvel2_dx1 + dvel3_dx1*dvel3_dx1 
-                      + dvel1_dx2*dvel1_dx2 + dvel3_dx2*dvel3_dx2 
-                      + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3);
-
-        phdif->nu(ISO,k,j,i) = phdif->nu_iso * grad_vel/grad_vel_0;
+          phdif->nu(ISO,k,j,i) = phdif->nu_iso * grad_vel/grad_vel_0;
+        }
       }
     }
   }
@@ -817,25 +818,27 @@ void NonlinearMixingConduction(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
 {
   Real dvel2_dx1, dvel3_dx1, dvel1_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3;
   Real grad_vel;
+  if (phdif->kappa_iso > 0.0) {
 
-  for (int k=ks; k<=ke; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
 
-        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
-        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+          dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+          dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
 
-        dvel1_dx2 = (prim(IVX,k,j,i) - prim(IVX,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
-        dvel3_dx2 = (prim(IVZ,k,j,i) - prim(IVZ,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+          dvel1_dx2 = (prim(IVX,k,j,i) - prim(IVX,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+          dvel3_dx2 = (prim(IVZ,k,j,i) - prim(IVZ,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
 
-        dvel1_dx3 = (prim(IVX,k,j,i) - prim(IVX,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
-        dvel2_dx3 = (prim(IVY,k,j,i) - prim(IVY,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+          dvel1_dx3 = (prim(IVX,k,j,i) - prim(IVX,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+          dvel2_dx3 = (prim(IVY,k,j,i) - prim(IVY,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
 
-        grad_vel = sqrt(dvel2_dx1*dvel2_dx1 + dvel3_dx1*dvel3_dx1 
-                      + dvel1_dx2*dvel1_dx2 + dvel3_dx2*dvel3_dx2 
-                      + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3);
+          grad_vel = sqrt(dvel2_dx1*dvel2_dx1 + dvel3_dx1*dvel3_dx1 
+                        + dvel1_dx2*dvel1_dx2 + dvel3_dx2*dvel3_dx2 
+                        + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3);
 
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * grad_vel/grad_vel_0;
+          phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * grad_vel/grad_vel_0;
+        }
       }
     }
   }
