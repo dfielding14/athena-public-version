@@ -786,7 +786,7 @@ void NonlinearMixingViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const Athen
   Real grad_vel;    
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-      phdif->nu(ISO,k,j,i) = 0.0;
+      phdif->nu(ISO,k,j,is) = 0.0;
       for (int i=is+1; i<=ie; ++i) {
 
         dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
