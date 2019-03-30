@@ -835,16 +835,15 @@ void NonlinearMixingConduction(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
                       + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3);
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * grad_vel/grad_vel_0;
-        std::cout << " grad_vel = " << grad_vel << 
-                     " grad_vel/grad_vel_0 = " << grad_vel/grad_vel_0 << 
-                     " phdif->kappa_iso = " << phdif->kappa_iso << 
-                     " phdif->kappa(ISO,k,j,i) = " << phdif->kappa(ISO,k,j,i) << 
-                     " dvel2_dx1 = " << dvel2_dx1 << 
-                     " dvel3_dx1 = " << dvel3_dx1 << 
-                     " dvel1_dx2 = " << dvel1_dx2 << 
-                     " dvel3_dx2 = " << dvel3_dx2 << 
-                     " dvel1_dx3 = " << dvel1_dx3 << 
-                     " dvel2_dx3 = " << dvel2_dx3 << 
+        std::cout << " prim(IVX,k,j,i) = " << prim(IVX,k,j,i) << " prim(IVY,k,j,i) = " << prim(IVY,k,j,i) << " prim(IVZ,k,j,i) = " << prim(IVZ,k,j,i) << 
+                     " grad_vel_0 = " << grad_vel_0 << 
+                     " prim(IVY,k,j,i) - prim(IVY,k,j,i-1) = " << prim(IVY,k,j,i) - prim(IVY,k,j,i-1) << 
+                     " pmb->pcoord->dx1v(i-1) = " << pmb->pcoord->dx1v(i-1) << 
+                     " pmb->pcoord->dx2v(j-1) = " << pmb->pcoord->dx2v(j-1) << 
+                     " pmb->pcoord->h2v(i) = " << pmb->pcoord->h2v(i) << 
+                     " pmb->pcoord->dx3v(k-1) = " << pmb->pcoord->dx3v(k-1) << 
+                     " pmb->pcoord->h31v(i) = " << pmb->pcoord->h31v(i) << 
+                     " pmb->pcoord->h32v(j) = " << pmb->pcoord->h32v(j) << 
                      "\n";
       }
     }
