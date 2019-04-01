@@ -837,12 +837,6 @@ void NonlinearMixingConduction(HydroDiffusion *phdif, MeshBlock *pmb, const Athe
                       // + dvel1_dx3*dvel1_dx3 + dvel2_dx3*dvel2_dx3);
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * grad_vel/grad_vel_0;
-        // std::cout << " prim(IVY,k,j,i) = " << prim(IVY,k,j,i) << " prim(IVY,k,j,i-1) = " << prim(IVY,k,j,i-1) << 
-        //              " pmb->pcoord->dx1v(i) = " << pmb->pcoord->dx1f(i) << 
-        //              " i = " << i << 
-        //              " i-1 = " << i-1 << 
-        //              " grad_vel = " << grad_vel << 
-        //              "\n";
       }
     }
   }
