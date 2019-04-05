@@ -22,10 +22,10 @@
 // External library headers
 #include <hdf5.h>  // H5*, hid_t, hsize_t, H5*()
 
-// Configuration checking
-#if MAGNETIC_FIELDS_ENABLED
-#error "This problem generator cannot be used with MHD (yet)"
-#endif
+// // Configuration checking
+// #if MAGNETIC_FIELDS_ENABLED
+// #error "This problem generator cannot be used with MHD (yet)"
+// #endif
 
 // Declarations
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
@@ -388,6 +388,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real lambda_pert = pin->GetReal("problem", "lambda_pert");
   Real z_top = pin->GetReal("problem", "z_top");
   Real z_bot = pin->GetReal("problem", "z_bot");
+
+#if MAGNETIC_FIELDS_ENABLED
+  Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
+  int B_direction = pin->GetOrAddInteger("problem", "B_direction", 0); // 0 = x, 1 = y, 2 = z
+#endif 
+
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     Real z = pcoord->x3v(k);
@@ -408,6 +414,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
           phydro->w(IVZ,k,j,i) = 0.0;
         }
+#if MAGNETIC_FIELDS_ENABLED
+        pfield->b.x1f(k,j,i) = (B_direction == 0) ?  sqrt(2*pgas_0/beta): 0.0;
+        pfield->b.x2f(k,j,i) = (B_direction == 1) ?  sqrt(2*pgas_0/beta): 0.0;
+        pfield->b.x3f(k,j,i) = (B_direction == 2) ?  sqrt(2*pgas_0/beta): 0.0; // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+#endif 
       }
     }
   }
@@ -536,6 +547,14 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
             Real u = cons_local(IEN,k,j,i) - (SQR(cons_local(IM1,k,j,i))
                 + SQR(cons_local(IM2,k,j,i)) + SQR(cons_local(IM3,k,j,i)))
                 / (2.0 * cons_local(IDN,k,j,i));
+// Subtract off magnetic energy part... 
+// #if MAGNETIC_FIELDS_ENABLED 
+//           const Real &bcc1 = bcc(IB1,k,j,i);
+//           const Real &bcc2 = bcc(IB2,k,j,i);
+//           const Real &bcc3 = bcc(IB3,k,j,i);
+//           Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
+//           u -= magnetic; 
+// #endif 
             Real delta_e = std::min(edot_cool * dt, u);
             user_out_var_local(0,k,j,i) = edot_cool;
             delta_e_mesh += delta_e * vol_cell;
@@ -554,6 +573,7 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     delta_e_tot = delta_e_mesh;
 #endif
   }
+
 
   // Store or extract redistributed heating
   if (pmb->lid == 0) {
@@ -607,6 +627,13 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
         Real delta_e = -edot_cool(k,j,i) * dt;
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
+#if MAGNETIC_FIELDS_ENABLED
+        const Real &bcc1 = bcc(IB1,k,j,i);
+        const Real &bcc2 = bcc(IB2,k,j,i);
+        const Real &bcc3 = bcc(IB3,k,j,i);
+        Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
+        u -= magnetic; 
+#endif 
         delta_e = std::max(delta_e, -u);
         if (t > t_cool_start){
           e += delta_e;
@@ -616,15 +643,17 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
         }
 
         // Apply temperature ceiling
-        Real u_max = temperature_max * rho / (gamma_adi-1.0);
-        kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
-        u = e - kinetic;
-        if (u > u_max) {
-          e = kinetic + u_max;
-          if (stage == 2) {
-            delta_e_ceil += (u - u_max) * vol_cell;
-          }
-        }
+//         Real u_max = temperature_max * rho / (gamma_adi-1.0);
+//         u = e - kinetic;
+// #if MAGNETIC_FIELDS_ENABLED
+//         u -= magnetic; 
+// #endif 
+//         if (u > u_max) {
+//           e = kinetic + u_max;
+//           if (stage == 2) {
+//             delta_e_ceil += (u - u_max) * vol_cell;
+//           }
+//         }
       }
     }
   }
