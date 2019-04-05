@@ -61,8 +61,6 @@ static Real drive_duration, drive_separation, dedt_on;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static int turb_grid_size;
-static Real kappa;
-static bool conduction_on;
 static Real dt_cutoff;
 
 static Real grav_accel;
@@ -138,8 +136,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
 
   // conduction
-  kappa = pin->GetReal("problem", "kappa");
-  conduction_on = pin->GetBoolean("problem", "conduction_on");
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
 
   // gravity
@@ -491,11 +487,7 @@ Real cooling_timestep(MeshBlock *pmb)
             Real dt;
             Real edot = fabs(edot_cool(k,j,i));
             Real press = pmb->phydro->w(IPR,k,j,i);
-            if (conduction_on){
-              dt = cfl_cool * std::min( SQR(pmb->pcoord->dx1f(i))/kappa , 1.5*press/edot); // experiment with that cfl_cool
-            } else {
-              dt = cfl_cool * 1.5*press/edot;
-            }
+            dt = cfl_cool * 1.5*press/edot;
             dt = std::max( dt , dt_cutoff );
             min_dt = std::min(min_dt, dt);
           }
