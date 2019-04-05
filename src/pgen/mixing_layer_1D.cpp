@@ -52,6 +52,12 @@ void SmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaAr
 void SmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
+void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 // Global variables
 static const Real mu_m_h = 1.008 * 1.660539040e-24;
 static Real gamma_adi;
@@ -370,6 +376,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
   if (SmagorinskyConduction_on){
     EnrollConductionCoefficient(SmagorinskyConduction);
+  }
+
+
+  bool DeviatoricSmagorinskyViscosity_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyViscosity_on", false);
+  bool DeviatoricSmagorinskyConduction_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyConduction_on", false);
+
+  if (DeviatoricSmagorinskyViscosity_on){
+    EnrollViscosityCoefficient(DeviatoricSmagorinskyViscosity);
+  }
+  if (DeviatoricSmagorinskyConduction_on){
+    EnrollConductionCoefficient(DeviatoricSmagorinskyConduction);
   }
 
 
@@ -928,6 +945,89 @@ void SmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaAr
         // dvel3_dx3 = (prim(IVZ,k,j,i) - prim(IVZ,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
 
         S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
+
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+
+
+
+
+
+
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Viscosity 
+// nu = (C * dx)^2 * |S|
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1; //, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->nu(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        // dvel1_dx2 = (prim(IVX,k,j,i) - prim(IVX,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+        // dvel2_dx2 = (prim(IVY,k,j,i) - prim(IVY,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+        // dvel3_dx2 = (prim(IVZ,k,j,i) - prim(IVZ,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+
+        // dvel1_dx3 = (prim(IVX,k,j,i) - prim(IVX,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+        // dvel2_dx3 = (prim(IVY,k,j,i) - prim(IVY,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+        // dvel3_dx3 = (prim(IVZ,k,j,i) - prim(IVZ,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+
+        S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
+
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Conduction 
+// kappa = (C * dx)^2 * |S| / Prandtl
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1;//, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->kappa(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        // dvel1_dx2 = (prim(IVX,k,j,i) - prim(IVX,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+        // dvel2_dx2 = (prim(IVY,k,j,i) - prim(IVY,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+        // dvel3_dx2 = (prim(IVZ,k,j,i) - prim(IVZ,k,j-1,i))/pmb->pcoord->dx2v(j-1)/pmb->pcoord->h2v(i);
+
+        // dvel1_dx3 = (prim(IVX,k,j,i) - prim(IVX,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+        // dvel2_dx3 = (prim(IVY,k,j,i) - prim(IVY,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+        // dvel3_dx3 = (prim(IVZ,k,j,i) - prim(IVZ,k-1,j,i))/pmb->pcoord->dx3v(k-1)/pmb->pcoord->h31v(i)/pmb->pcoord->h32v(j);
+
+        S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
       }
