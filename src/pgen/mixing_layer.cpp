@@ -414,18 +414,29 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
           phydro->w(IVZ,k,j,i) = 0.0;
         }
-#if MAGNETIC_FIELDS_ENABLED
-        pfield->b.x1f(k,j,i) = (B_direction == 0) ?  sqrt(2*pgas_0/beta): 0.0;
-        pfield->b.x2f(k,j,i) = (B_direction == 1) ?  sqrt(2*pgas_0/beta): 0.0;
-        pfield->b.x3f(k,j,i) = (B_direction == 2) ?  sqrt(2*pgas_0/beta): 0.0; // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
-#endif 
       }
     }
   }
 
-  // Initialize conserved values
-  AthenaArray<Real> b;
-  peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  // initialize interface B, assuming vertical field only B=(0,0,1)
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke+1; k++) {
+      for (int j=js; j<=je; j++) {
+        for (int i=is; i<=ie+1; i++) {
+          pfield->b.x1f(k,j,i) = (B_direction == 0) ?  sqrt(2*pgas_0/beta): 0.0;
+          pfield->b.x2f(k,j,i) = (B_direction == 1) ?  sqrt(2*pgas_0/beta): 0.0;
+          pfield->b.x3f(k,j,i) = (B_direction == 2) ?  sqrt(2*pgas_0/beta): 0.0; 
+          phydro->u(IEN,k,j,i) += pgas_0/beta;
+        }
+      }
+    }
+    // Initialize conserved values
+    peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  } else {
+    // Initialize conserved values
+    AthenaArray<Real> b;
+    peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
+  }
   return;
 }
 
@@ -627,13 +638,13 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
         Real delta_e = -edot_cool(k,j,i) * dt;
         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
         Real u = e - kinetic;
-#if MAGNETIC_FIELDS_ENABLED
-        const Real &bcc1 = bcc(IB1,k,j,i);
-        const Real &bcc2 = bcc(IB2,k,j,i);
-        const Real &bcc3 = bcc(IB3,k,j,i);
-        Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
-        u -= magnetic; 
-#endif 
+if (MAGNETIC_FIELDS_ENABLED) {  
+          const Real &bcc1 = bcc(IB1,k,j,i);
+          const Real &bcc2 = bcc(IB2,k,j,i);
+          const Real &bcc3 = bcc(IB3,k,j,i);
+          Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
+          u -= magnetic; 
+        }
         delta_e = std::max(delta_e, -u);
         if (t > t_cool_start){
           e += delta_e;
