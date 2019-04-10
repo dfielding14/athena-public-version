@@ -37,10 +37,20 @@ static Real Interpolate2D(const AthenaArray<double> &table, int j, int i, Real g
 static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i, Real h,
     Real g, Real f);
 
+// Boundary Conditions
+void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+
 // Global variables
 static const Real mu_m_h = 1.008 * 1.660539040e-24;
 static Real gamma_adi;
 static Real rho_0, pgas_0;
+static Real density_contrast,velocity;
 static Real overdensity_factor, overdensity_radius;
 static Real temperature_max;
 static Real rho_table_min, rho_table_max, rho_table_n;
@@ -83,6 +93,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho_0 = pin->GetReal("problem", "rho_0");
   pgas_0 = pin->GetReal("problem", "pgas_0");
   temperature_max = pin->GetReal("hydro", "tceil");
+  density_contrast = pin->GetReal("problem", "density_contrast");
+  velocity = pin->GetReal("problem", "velocity");
 
   // Read cooling-table-related parameters from input file
   rho_table_min = pin->GetReal("problem", "rho_table_min");
@@ -332,6 +344,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
   EnrollUserTimeStepFunction(cooling_timestep);
 
+
+  // Enroll no inflow boundary condition but only if it is turned on
+  if(mesh_bcs[INNER_X3] == GetBoundaryFlag("user")) {
+    EnrollUserBoundaryFunction(INNER_X3, ConstantShearInflowInnerX3);
+  }
+  if(mesh_bcs[OUTER_X3] == GetBoundaryFlag("user")) {
+    EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
+  }
   return;
 }
 
@@ -382,8 +402,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
 
   Real smoothing_thickness = pin->GetReal("problem", "smoothing_thickness");
-  Real density_contrast = pin->GetReal("problem", "density_contrast");
-  Real velocity = pin->GetReal("problem", "velocity");
   Real velocity_pert = pin->GetReal("problem", "velocity_pert");
   Real lambda_pert = pin->GetReal("problem", "lambda_pert");
   Real z_top = pin->GetReal("problem", "z_top");
@@ -781,3 +799,121 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
 
 
 
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief ConstantShearInflow boundary conditions, inner x3 boundary
+
+void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh) {
+  // copy hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        prim(n,ks-k,j,i) = prim(n,ks,j,i);
+        if ( n == IPR ){
+          prim(IPR,ks-k,j,i) = pgas_0;
+        } 
+        if ( n == IDN ){
+          prim(IDN,ks-k,j,i) = rho_0/sqrt(density_contrast);
+        } 
+        if ( n == IVY ){
+          prim(IVX,ks-k,j,i) = velocity;
+        } 
+      }
+    }}
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ks-k),j,i) = b.x1f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ks-k),j,i) = b.x2f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ks-k),j,i) = b.x3f(ks,j,i);
+      }
+    }}
+  }
+
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief ConstantShearInflow boundary conditions, outer x3 boundary
+
+void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh) {
+  // copy hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        prim(n,ke+k,j,i) = prim(n,ke,j,i);
+        if ( n == IPR ){
+          prim(IPR,ke+k,j,i) = pgas_0;
+        } 
+        if ( n == IDN ){
+          prim(IDN,ke+k,j,i) = rho_0/sqrt(density_contrast);
+        } 
+        if ( n == IVY ){
+          prim(IVX,ke+k,j,i) = velocity;
+        } 
+      }
+    }}
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ke+k  ),j,i) = b.x1f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ke+k  ),j,i) = b.x2f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ke+k+1),j,i) = b.x3f((ke+1),j,i);
+      }
+    }}
+  }
+
+  return;
+}
