@@ -363,7 +363,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if(mesh_bcs[OUTER_X3] == GetBoundaryFlag("user")) {
     bool NoInflow = pin->GetOrAddBoolean("problem", "NoInflow", false);
     if (NoInflow) {
-      std::cout << "Using No Inflow BC " << "\n";
       EnrollUserBoundaryFunction(OUTER_X3, ConstantShearNoInflowOuterX3);  
     } else {
       EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
@@ -1034,7 +1033,6 @@ void ConstantShearNoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<
           prim(IVX,ke+k,j,i) = velocity;
         } 
         if (( n == IVZ )&(prim(IVZ,ke+k,j,i)<0)){
-          std::cout << "prim(IVZ,ke+k,j,i)<0 = " << prim(IVZ,ke+k,j,i) << "\n";
           prim(IVZ,ke+k,j,i) = 0.0;
         } 
       }
