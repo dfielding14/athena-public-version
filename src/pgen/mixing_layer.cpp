@@ -389,10 +389,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real z_top = pin->GetReal("problem", "z_top");
   Real z_bot = pin->GetReal("problem", "z_bot");
 
-#if MAGNETIC_FIELDS_ENABLED
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
   int B_direction = pin->GetOrAddInteger("problem", "B_direction", 0); // 0 = x, 1 = y, 2 = z
-#endif 
 
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
@@ -777,3 +775,9 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
       + h*(1.0-g)*f*val_101 + h*g*(1.0-f)*val_110 + h*g*f*val_111;
   return val;
 }
+
+
+
+
+
+
