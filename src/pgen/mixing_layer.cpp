@@ -363,6 +363,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if(mesh_bcs[OUTER_X3] == GetBoundaryFlag("user")) {
     bool NoInflow = pin->GetOrAddBoolean("problem", "NoInflow", false);
     if (NoInflow) {
+      std::cout << "Using No Inflow BC " << "\n";
       EnrollUserBoundaryFunction(OUTER_X3, ConstantShearNoInflowOuterX3);  
     } else {
       EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
