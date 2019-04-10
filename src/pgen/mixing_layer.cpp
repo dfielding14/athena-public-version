@@ -44,6 +44,12 @@ void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
 void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                     FaceField &b, Real time, Real dt,
                     int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantShearNoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantShearNoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
 
 
 // Global variables
@@ -347,10 +353,20 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Enroll no inflow boundary condition but only if it is turned on
   if(mesh_bcs[INNER_X3] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(INNER_X3, ConstantShearInflowInnerX3);
+    bool NoInflow = pin->GetOrAddBoolean("problem", "NoInflow", false);
+    if (NoInflow) {
+      EnrollUserBoundaryFunction(INNER_X3, ConstantShearNoInflowInnerX3);  
+    } else {
+      EnrollUserBoundaryFunction(INNER_X3, ConstantShearInflowInnerX3);
+    }
   }
   if(mesh_bcs[OUTER_X3] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
+    bool NoInflow = pin->GetOrAddBoolean("problem", "NoInflow", false);
+    if (NoInflow) {
+      EnrollUserBoundaryFunction(OUTER_X3, ConstantShearNoInflowOuterX3);  
+    } else {
+      EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
+    }
   }
   return;
 }
@@ -883,6 +899,141 @@ void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
         } 
         if ( n == IVY ){
           prim(IVX,ke+k,j,i) = velocity;
+        } 
+      }
+    }}
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ke+k  ),j,i) = b.x1f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ke+k  ),j,i) = b.x2f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ke+k+1),j,i) = b.x3f((ke+1),j,i);
+      }
+    }}
+  }
+
+  return;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearNoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief ConstantShearNoInflow boundary conditions, inner x3 boundary
+
+void ConstantShearNoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh) {
+  // copy hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        prim(n,ks-k,j,i) = prim(n,ks,j,i);
+        if ( n == IPR ){
+          prim(IPR,ks-k,j,i) = pgas_0;
+        } 
+        if ( n == IDN ){
+          prim(IDN,ks-k,j,i) = rho_0/sqrt(density_contrast);
+        } 
+        if ( n == IVX ){
+          prim(IVX,ks-k,j,i) = velocity;
+        } 
+        if (( n == IVZ )&(prim(IVZ,ks,j,i)>0)){
+          prim(IVZ,ks-k,j,i) = 0.0;
+        } 
+      }
+    }}
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ks-k),j,i) = b.x1f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ks-k),j,i) = b.x2f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ks-k),j,i) = b.x3f(ks,j,i);
+      }
+    }}
+  }
+
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearNoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief ConstantShearNoInflow boundary conditions, outer x3 boundary
+
+void ConstantShearNoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh) {
+  // copy hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        prim(n,ke+k,j,i) = prim(n,ke,j,i);
+        if ( n == IPR ){
+          prim(IPR,ke+k,j,i) = pgas_0;
+        } 
+        if ( n == IDN ){
+          prim(IDN,ke+k,j,i) = rho_0/sqrt(density_contrast);
+        } 
+        if ( n == IVX ){
+          prim(IVX,ke+k,j,i) = velocity;
+        } 
+        if (( n == IVZ )&(prim(IVZ,ke,j,i)<0)){
+          prim(IVZ,ke+k,j,i) = 0.0;
         } 
       }
     }}
