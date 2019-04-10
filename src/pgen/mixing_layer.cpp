@@ -970,7 +970,7 @@ void ConstantShearNoInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<
         if ( n == IVX ){
           prim(IVX,ks-k,j,i) = velocity;
         } 
-        if (( n == IVZ )&(prim(IVZ,ks,j,i)>0)){
+        if (( n == IVZ )&(prim(IVZ,ks-k,j,i)>0)){
           prim(IVZ,ks-k,j,i) = 0.0;
         } 
       }
@@ -1032,7 +1032,8 @@ void ConstantShearNoInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<
         if ( n == IVX ){
           prim(IVX,ke+k,j,i) = velocity;
         } 
-        if (( n == IVZ )&(prim(IVZ,ke,j,i)<0)){
+        if (( n == IVZ )&(prim(IVZ,ke+k,j,i)<0)){
+          std::cout << "prim(IVZ,ke+k,j,i)<0 = " << prim(IVZ,ke+k,j,i) << "\n";
           prim(IVZ,ke+k,j,i) = 0.0;
         } 
       }
