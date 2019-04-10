@@ -838,7 +838,7 @@ void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
         if ( n == IDN ){
           prim(IDN,ks-k,j,i) = rho_0/sqrt(density_contrast);
         } 
-        if ( n == IVY ){
+        if ( n == IVX ){
           prim(IVX,ks-k,j,i) = velocity;
         } 
       }
@@ -897,7 +897,7 @@ void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
         if ( n == IDN ){
           prim(IDN,ke+k,j,i) = rho_0/sqrt(density_contrast);
         } 
-        if ( n == IVY ){
+        if ( n == IVX ){
           prim(IVX,ke+k,j,i) = velocity;
         } 
       }
