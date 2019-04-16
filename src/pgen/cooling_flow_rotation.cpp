@@ -237,7 +237,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Read sizes of tables
   int number_of_pressure_bins; 
-  dataset = H5Dopen(file, "/number_of_pressure_bins", H5P_DEFAULT);
+  hid_t dataset = H5Dopen(file, "/number_of_pressure_bins", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, property_list_transfer,
       &number_of_pressure_bins);
   H5Dclose(dataset);
