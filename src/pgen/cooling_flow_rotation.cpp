@@ -58,7 +58,7 @@ static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs,f2;
-static T_SF, rho_max;
+static Real T_SF, rho_max;
 
 static Real r_inner, r_outer;
 
@@ -958,7 +958,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           }
         }
         if ((rho > rho_max) && (temperature(k,j,i) < T_SF)){
-          Real delta_rho = rho-rho_max
+          Real delta_rho = rho-rho_max;
           delta_M_ceil += delta_rho * pmb->pcoord->GetCellVolume(k,j,i);
           e -= kinetic;
           m1 *= rho_max/rho;
