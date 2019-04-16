@@ -120,13 +120,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   t_cool_start = pin->GetReal("problem", "t_cool_start");
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 0.0);
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
+  Real muH = pin->GetOrAddReal("problem", "muH", 1.3333333333);
 
+
+  // dimensionful quantities for normalization
   Real kpc  = 3.08567758096e+21;
   Real G    = 6.67384e-08;
   Real mp   = 1.67373522381e-24; 
   Real Msun = 2.0e33;
   Real kb   = 1.3806488e-16;
   Real yr   = 31557600.0;
+  
   // ICs
   r_inner      = mesh_size.x1min;
   r_outer      = mesh_size.x1max;
@@ -164,16 +168,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho0         = Mhalo * Msun / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
   Real nu      = pin->GetReal("problem", "nu"); // Diemer+14 figure 1
   Real rt      = (1.9-0.18*nu)*r200m;
-
   grav_scale_inner = FourPiG*rs*(SQR(time_scale)*rho_scale);
-
   aaa = 5. * cnfw * r200m / rvir;
   rs_rt = rs/rt;
-
   Real x_outer = r_outer/rvir; 
 
   // rotation
-
   rotation = pin->GetBoolean("problem", "rotation");
   lambda = pin->GetOrAddReal("problem", "lambda", 0.0);
   r_circ = lambda * rvir;
