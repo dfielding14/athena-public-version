@@ -41,8 +41,6 @@ static Real grav_pot(Real r);
 static const Real mu_m_h = 1.008 * 1.660539040e-24;
 static Real gamma_adi;
 static Real temperature_max;
-static Real rho_table_min, rho_table_max, rho_table_n;
-static Real pgas_table_min, pgas_table_max, pgas_table_n;
 static Real t_cool_start;
 static Real beta;
 static Real grav_scale_inner, aaa, rs_rt, rhom, rho0;
@@ -55,10 +53,9 @@ static Real dt_cutoff, cfl_cool;
 static Real pfloor, dfloor, vceil;
 
 static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
-static Real rho_wind, v_wind, cs_wind, eta;
+static Real rho_wind, v_wind, cs_wind, eta, Mdot_wind, opening_angle;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs,f2;
-static T_SF, rho_max;
 
 static Real r_inner, r_outer;
 
@@ -69,6 +66,8 @@ static Real lambda, r_circ;
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
@@ -119,27 +118,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real time_scale = length_scale/vel_scale;
   temperature_max = pin->GetReal("hydro", "tceil");
 
-  // Read cooling-table-related parameters from input file
-  rho_table_min = pin->GetReal("problem", "rho_table_min");
-  rho_table_max = pin->GetReal("problem", "rho_table_max");
-  rho_table_n = pin->GetReal("problem", "rho_table_n");
-  pgas_table_min = pin->GetReal("problem", "pgas_table_min");
-  pgas_table_max = pin->GetReal("problem", "pgas_table_max");
-  pgas_table_n = pin->GetReal("problem", "pgas_table_n");
-  std::string cooling_file = pin->GetString("problem", "cooling_file");
-  Real z_z_solar = pin->GetReal("problem", "relative_metallicity");
-  Real chi_he = pin->GetReal("problem", "helium_mass_fraction");
-  int num_helium_fractions =
-      pin->GetOrAddInteger("problem", "num_helium_fractions_override", 0);
-  int num_hydrogen_densities =
-      pin->GetOrAddInteger("problem", "num_hydrogen_densities_override", 0);
-  int num_temperatures = pin->GetOrAddInteger("problem", "num_temperatures_override", 0);
-
   // cooling 
   t_cool_start = pin->GetReal("problem", "t_cool_start");
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 0.0);
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
+  Real muH = pin->GetOrAddReal("problem", "muH", 1.3333333333);
 
+
+  // dimensionful quantities for normalization
   Real kpc  = 3.08567758096e+21;
   Real G    = 6.67384e-08;
   Real mp   = 1.67373522381e-24; 
@@ -162,11 +148,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real T_wind   = pin->GetOrAddReal("problem", "T_wind", 1.0e4);
   cs_wind       = sqrt(kb*T_wind/(0.62*mp))/vel_scale;
   eta           = pin->GetOrAddReal("problem", "eta", 0.0);
-
-  // SF proxy
-  Real n_max       = pin->GetOrAddReal("problem", "n_max", 1.0e20);
-  rho_max = n_max*mp*0.62 / rho_scale;
-  T_SF          = pin->GetOrAddReal("problem", "T_SF", 3.e4);
+  Mdot_wind     = pin->GetOrAddReal("problem", "Mdot_wind", 0.0);
+  opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
 
   // Gravity
   Mhalo        = pin->GetReal("problem", "Mhalo"); // in Msun
@@ -189,16 +172,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho0         = Mhalo * Msun / (4. * PI * pow(rs,3) * ( std::log(1.+cnfw) - cnfw/(1.+cnfw) )) / (rho_scale * pow(length_scale,3));
   Real nu      = pin->GetReal("problem", "nu"); // Diemer+14 figure 1
   Real rt      = (1.9-0.18*nu)*r200m;
-
   grav_scale_inner = FourPiG*rs*(SQR(time_scale)*rho_scale);
-
   aaa = 5. * cnfw * r200m / rvir;
   rs_rt = rs/rt;
-
   Real x_outer = r_outer/rvir; 
 
   // rotation
-
   rotation = pin->GetBoolean("problem", "rotation");
   lambda = pin->GetOrAddReal("problem", "lambda", 0.0);
   r_circ = lambda * rvir;
@@ -232,9 +211,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
 
 
-
-
   if (MAGNETIC_FIELDS_ENABLED) beta = pin->GetOrAddReal("problem", "beta", 1.0e10);
+
+  // Read cooling-table-related parameters from input file
+  std::string cooling_file = pin->GetString("problem", "cooling_file");
+  Real z_z_solar = pin->GetReal("problem", "relative_metallicity");
 
   // Open cooling data file
   hid_t property_list_file = H5Pcreate(H5P_FILE_ACCESS);
@@ -258,112 +239,93 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
   #endif
 
-  // Read solar abundances
-  double chi_vals[2];
-  hsize_t dims[1];
-  dims[0] = 2;
-  hid_t dataset = H5Dopen(file, "Header/Abundances/Solar_mass_fractions", H5P_DEFAULT);
-  hid_t dataspace = H5Screate_simple(1, dims, NULL);
-  H5Dread(dataset, H5T_NATIVE_DOUBLE, dataspace, dataspace, property_list_transfer,
-      chi_vals);
-  H5Dclose(dataset);
-  H5Sclose(dataspace);
-  Real chi_h_solar = chi_vals[0];
-  Real chi_he_solar = chi_vals[1];
-  Real chi_z_solar = 1.0 - chi_h_solar - chi_he_solar;
-  Real chi_h = 1.0 - chi_he - z_z_solar * chi_z_solar;
-
   // Read sizes of tables
-  if (num_helium_fractions <= 0) {
-    dataset = H5Dopen(file, "Header/Number_of_helium_fractions", H5P_DEFAULT);
-    H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, property_list_transfer,
-        &num_helium_fractions);
-    H5Dclose(dataset);
-  }
-  if (num_hydrogen_densities <= 0) {
-    dataset = H5Dopen(file, "Header/Number_of_density_bins", H5P_DEFAULT);
-    H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, property_list_transfer,
-        &num_hydrogen_densities);
-    H5Dclose(dataset);
-  }
-  if (num_temperatures <= 0) {
-    dataset = H5Dopen(file, "Header/Number_of_temperature_bins", H5P_DEFAULT);
-    H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, property_list_transfer,
-        &num_temperatures);
-    H5Dclose(dataset);
-  }
+  int number_of_pressure_bins; 
+  hid_t dataset = H5Dopen(file, "/number_of_pressure_bins", H5P_DEFAULT);
+  H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, property_list_transfer,
+      &number_of_pressure_bins);
+  H5Dclose(dataset);
+
+  int number_of_rho_bins; 
+  dataset = H5Dopen(file, "/number_of_rho_bins", H5P_DEFAULT);
+  H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, property_list_transfer,
+      &number_of_rho_bins);
+  H5Dclose(dataset);
 
   // Read sample data from file
-  AthenaArray<double> helium_fraction_samples, hydrogen_density_samples,
-      temperature_samples, energy_samples;
-  helium_fraction_samples.NewAthenaArray(num_helium_fractions);
-  hydrogen_density_samples.NewAthenaArray(num_hydrogen_densities);
-  temperature_samples.NewAthenaArray(num_temperatures);
-  energy_samples.NewAthenaArray(num_temperatures);
-  dataset = H5Dopen(file, "Metal_free/Helium_mass_fraction_bins", H5P_DEFAULT);
+  AthenaArray<double> pressure_samples, rho_samples;
+  pressure_samples.NewAthenaArray(number_of_pressure_bins);
+  rho_samples.NewAthenaArray(number_of_rho_bins);
+  dataset = H5Dopen(file, "pressure", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      helium_fraction_samples.data());
+      pressure_samples.data());
   H5Dclose(dataset);
-  dataset = H5Dopen(file, "Metal_free/Hydrogen_density_bins", H5P_DEFAULT);
+  dataset = H5Dopen(file, "rho", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      hydrogen_density_samples.data());
-  H5Dclose(dataset);
-  dataset = H5Dopen(file, "Metal_free/Temperature_bins", H5P_DEFAULT);
-  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      temperature_samples.data());
-  H5Dclose(dataset);
-  dataset = H5Dopen(file, "Metal_free/Temperature/Energy_density_bins", H5P_DEFAULT);
-  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      energy_samples.data());
+      rho_samples.data());
   H5Dclose(dataset);
 
   // Read temperature data from file
   AthenaArray<double> temperature_table;
-  temperature_table.NewAthenaArray(num_helium_fractions, num_temperatures,
-      num_hydrogen_densities);
-  dataset = H5Dopen(file, "Metal_free/Temperature/Temperature", H5P_DEFAULT);
+  temperature_table.NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);
+  dataset = H5Dopen(file, "temperature", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
       temperature_table.data());
   H5Dclose(dataset);
 
-  // Read electron density data from file
-  AthenaArray<double> electron_density_table, electron_density_solar_table;
-  electron_density_table.NewAthenaArray(num_helium_fractions, num_temperatures,
-      num_hydrogen_densities);
-  electron_density_solar_table.NewAthenaArray(num_temperatures, num_hydrogen_densities);
-  dataset = H5Dopen(file, "Metal_free/Electron_density_over_n_h", H5P_DEFAULT);
+  // Read mu data from file
+  AthenaArray<double> mu_table;
+  mu_table.NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);
+  dataset = H5Dopen(file, "mu", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      electron_density_table.data());
-  H5Dclose(dataset);
-  dataset = H5Dopen(file, "Solar/Electron_density_over_n_h", H5P_DEFAULT);
-  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      electron_density_solar_table.data());
+      mu_table.data());
   H5Dclose(dataset);
 
-  // Read cooling data from file
-  AthenaArray<double> cooling_no_metals_table, cooling_metals_table;
-  cooling_no_metals_table.NewAthenaArray(num_helium_fractions, num_temperatures,
-      num_hydrogen_densities);
-  cooling_metals_table.NewAthenaArray(num_temperatures, num_hydrogen_densities);
-  dataset = H5Dopen(file, "Metal_free/Net_Cooling", H5P_DEFAULT);
+  // Read Metal_Cooling data from file
+  AthenaArray<double> Metal_Cooling_table;
+  Metal_Cooling_table.NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);
+  dataset = H5Dopen(file, "Metal_Cooling", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      cooling_no_metals_table.data());
+      Metal_Cooling_table.data());
   H5Dclose(dataset);
-  dataset = H5Dopen(file, "Solar/Net_cooling", H5P_DEFAULT);
+
+  // Read Primordial_Cooling data from file
+  AthenaArray<double> Primordial_Cooling_table;
+  Primordial_Cooling_table.NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);
+  dataset = H5Dopen(file, "Primordial_Cooling", H5P_DEFAULT);
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
-      cooling_metals_table.data());
+      Primordial_Cooling_table.data());
+  H5Dclose(dataset);
+
+  // Read Metal_Heating data from file
+  AthenaArray<double> Metal_Heating_table;
+  Metal_Heating_table.NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);
+  dataset = H5Dopen(file, "Metal_Heating", H5P_DEFAULT);
+  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
+      Metal_Heating_table.data());
+  H5Dclose(dataset);
+
+  // Read Primordial_Heating data from file
+  AthenaArray<double> Primordial_Heating_table;
+  Primordial_Heating_table.NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);
+  dataset = H5Dopen(file, "Primordial_Heating", H5P_DEFAULT);
+  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, property_list_transfer,
+      Primordial_Heating_table.data());
   H5Dclose(dataset);
 
   // Close cooling data file
   H5Pclose(property_list_transfer);
   H5Fclose(file);
 
+
+
+
   // Allocate fixed cooling table
   AllocateRealUserMeshDataField(5);
-  ruser_mesh_data[0].NewAthenaArray(rho_table_n);
-  ruser_mesh_data[1].NewAthenaArray(pgas_table_n);
-  ruser_mesh_data[2].NewAthenaArray(rho_table_n, pgas_table_n);
-  ruser_mesh_data[3].NewAthenaArray(rho_table_n, pgas_table_n);
+  ruser_mesh_data[0].NewAthenaArray(number_of_pressure_bins);                      // pressure 
+  ruser_mesh_data[1].NewAthenaArray(number_of_rho_bins);                           // density
+  ruser_mesh_data[2].NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);  // temperature
+  ruser_mesh_data[3].NewAthenaArray(number_of_pressure_bins, number_of_rho_bins);  // total cooling
   ruser_mesh_data[4].NewAthenaArray(2); // delta_e_tot, vol_tot
 
   Real vol_tot = (mesh_size.x3max - mesh_size.x3min)
@@ -371,125 +333,67 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
                  * (pow(mesh_size.x1max,3) - pow(mesh_size.x1min,3))/3.;
   ruser_mesh_data[4](1) = vol_tot;
 
-
-
   // Tabulate sample points
-  for (int i = 0; i < rho_table_n; ++i) {
-    ruser_mesh_data[0](i) = rho_table_min * std::pow(rho_table_max/rho_table_min,
-        static_cast<Real>(i)/static_cast<Real>(rho_table_n-1));
+  for (int i = 0; i < number_of_pressure_bins; ++i) {
+    ruser_mesh_data[0](i) = pressure_samples(i) / pgas_scale;
   }
-  for (int i = 0; i < pgas_table_n; ++i) {
-    ruser_mesh_data[1](i) = pgas_table_min * std::pow(pgas_table_max/pgas_table_min,
-        static_cast<Real>(i)/static_cast<Real>(pgas_table_n-1));
+  for (int i = 0; i < number_of_rho_bins; ++i) {
+    ruser_mesh_data[1](i) = rho_samples(i) / rho_scale;
   }
-
-  // Locate helium fraction in tables
-  int helium_fraction_index;
-  Real helium_fraction_fraction;
-  FindIndex(helium_fraction_samples, chi_he, &helium_fraction_index,
-      &helium_fraction_fraction);
-
-  // Tabulate cooling rate
-  for (int j = 0; j < rho_table_n; ++j) {
-    for (int i = 0; i < pgas_table_n; ++i) {
-
-      // Calculate gas properties
-      Real rho = ruser_mesh_data[0](j) * rho_scale;
-      Real pgas = ruser_mesh_data[1](i) * pgas_scale;
-      Real n_h =
-          rho / mu_m_h / (1.0 + chi_he / chi_h + z_z_solar * chi_z_solar / chi_h_solar);
-      Real u = pgas / (gamma_adi-1.0);
-
-      // Locate hydrogen density in tables
-      int hydrogen_density_index;
-      Real hydrogen_density_fraction;
-      FindIndex(hydrogen_density_samples, n_h, &hydrogen_density_index,
-          &hydrogen_density_fraction);
-
-      // Locate energy in tables
-      int energy_index;
-      Real energy_fraction;
-      FindIndex(energy_samples, u/rho, &energy_index, &energy_fraction);
-
-      // Interpolate temperature from table
-      Real temperature = Interpolate3D(temperature_table, helium_fraction_index,
-          energy_index, hydrogen_density_index, helium_fraction_fraction, energy_fraction,
-          hydrogen_density_fraction);
-      ruser_mesh_data[3](j,i) = temperature / temperature_scale;
-
-      // Locate temperature in tables
-      int temperature_index;
-      Real temperature_fraction;
-      FindIndex(temperature_samples, temperature, &temperature_index,
-          &temperature_fraction);
-
-      // Interpolate electron densities from tables
-      Real n_e_n_h = Interpolate3D(electron_density_table, helium_fraction_index,
-          temperature_index, hydrogen_density_index, helium_fraction_fraction,
-          temperature_fraction, hydrogen_density_fraction);
-      Real n_e_n_h_solar = Interpolate2D(electron_density_solar_table, temperature_index,
-          hydrogen_density_index, temperature_fraction, hydrogen_density_fraction);
-
-      // Interpolate cooling from tables
-      Real lambda_hhe_n_h_sq = Interpolate3D(cooling_no_metals_table,
-          helium_fraction_index, temperature_index, hydrogen_density_index,
-          helium_fraction_fraction, temperature_fraction, hydrogen_density_fraction);
-      Real lambda_zsolar_n_h_sq = Interpolate2D(cooling_metals_table, temperature_index,
-          hydrogen_density_index, temperature_fraction, hydrogen_density_fraction);
-
-      // Calculate cooling rate
-      Real edot_cool = SQR(n_h) * (lambda_hhe_n_h_sq
-          + lambda_zsolar_n_h_sq * n_e_n_h / n_e_n_h_solar * z_z_solar);
-      ruser_mesh_data[2](j,i) = edot_cool * length_scale / (pgas_scale * vel_scale);
+  for (int i = 0; i < number_of_pressure_bins; ++i) {
+    for (int j = 0; j < number_of_rho_bins; ++j) {
+      ruser_mesh_data[2](i,j) = temperature_table(i,j);
+      ruser_mesh_data[3](i,j)  = SQR(rho_samples(j)/(muH*mp)) * Primordial_Cooling_table(i,j) / (pgas_scale / time_scale);
+      ruser_mesh_data[3](i,j) -= SQR(rho_samples(j)/(muH*mp)) * Primordial_Heating_table(i,j) / (pgas_scale / time_scale);
+      ruser_mesh_data[3](i,j) += SQR(rho_samples(j)/(muH*mp)) * Metal_Cooling_table(i,j) * z_z_solar / (pgas_scale / time_scale);
+      ruser_mesh_data[3](i,j) -= SQR(rho_samples(j)/(muH*mp)) * Metal_Heating_table(i,j) * z_z_solar / (pgas_scale / time_scale);
     }
   }
 
-  // Delete intermediate tables
-  helium_fraction_samples.DeleteAthenaArray();
-  hydrogen_density_samples.DeleteAthenaArray();
-  temperature_samples.DeleteAthenaArray();
-  energy_samples.DeleteAthenaArray();
-  temperature_table.DeleteAthenaArray();
-  electron_density_table.DeleteAthenaArray();
-  electron_density_solar_table.DeleteAthenaArray();
-  cooling_no_metals_table.DeleteAthenaArray();
-  cooling_metals_table.DeleteAthenaArray();
 
- 
+  // Delete intermediate tables
+  pressure_samples.DeleteAthenaArray();
+  rho_samples.DeleteAthenaArray();
+  temperature_table.DeleteAthenaArray();
+  mu_table.DeleteAthenaArray();
+  Metal_Cooling_table.DeleteAthenaArray();
+  Primordial_Cooling_table.DeleteAthenaArray();
+  Metal_Heating_table.DeleteAthenaArray();
+  Primordial_Heating_table.DeleteAthenaArray();
+
   // Enroll user-defined functions
   EnrollUserExplicitSourceFunction(SourceFunction);
-  AllocateUserHistoryOutput(31);
+  AllocateUserHistoryOutput(30);
   EnrollUserHistoryOutput(0 , CoolingLosses, "e_cool");
   EnrollUserHistoryOutput(1 , CoolingLosses, "e_ceil");
-  EnrollUserHistoryOutput(2 , CoolingLosses, "M_ceil");
-  EnrollUserHistoryOutput(3 , fluxes, "Migal");
-  EnrollUserHistoryOutput(4 , fluxes, "Mi01");
-  EnrollUserHistoryOutput(5 , fluxes, "Mi025");
-  EnrollUserHistoryOutput(6 , fluxes, "Mi05");
-  EnrollUserHistoryOutput(7 , fluxes, "Mi10");
-  EnrollUserHistoryOutput(8 , fluxes, "Mi15");
-  EnrollUserHistoryOutput(9 , fluxes, "Mita");
-  EnrollUserHistoryOutput(10, fluxes, "Mogal");
-  EnrollUserHistoryOutput(11, fluxes, "Mo01");
-  EnrollUserHistoryOutput(12, fluxes, "Mo025");
-  EnrollUserHistoryOutput(13, fluxes, "Mo05");
-  EnrollUserHistoryOutput(14, fluxes, "Mo10");
-  EnrollUserHistoryOutput(15, fluxes, "Mo15");
-  EnrollUserHistoryOutput(16, fluxes, "Mota");
-  EnrollUserHistoryOutput(17, fluxes, "Eigal");
-  EnrollUserHistoryOutput(18, fluxes, "Ei01");
-  EnrollUserHistoryOutput(19, fluxes, "Ei025");
-  EnrollUserHistoryOutput(20, fluxes, "Ei05");
-  EnrollUserHistoryOutput(21, fluxes, "Ei10");
-  EnrollUserHistoryOutput(22, fluxes, "Ei15");
-  EnrollUserHistoryOutput(23, fluxes, "Eita");
-  EnrollUserHistoryOutput(24, fluxes, "Eogal");
-  EnrollUserHistoryOutput(25, fluxes, "Eo01");
-  EnrollUserHistoryOutput(26, fluxes, "Eo025");
-  EnrollUserHistoryOutput(27, fluxes, "Eo05");
-  EnrollUserHistoryOutput(28, fluxes, "Eo10");
-  EnrollUserHistoryOutput(29, fluxes, "Eo15");
-  EnrollUserHistoryOutput(30, fluxes, "Eota");
+  EnrollUserHistoryOutput(2 , fluxes, "Migal");
+  EnrollUserHistoryOutput(3 , fluxes, "Mi01");
+  EnrollUserHistoryOutput(4 , fluxes, "Mi025");
+  EnrollUserHistoryOutput(5 , fluxes, "Mi05");
+  EnrollUserHistoryOutput(6 , fluxes, "Mi10");
+  EnrollUserHistoryOutput(7 , fluxes, "Mi15");
+  EnrollUserHistoryOutput(8 , fluxes, "Mita");
+  EnrollUserHistoryOutput(9 , fluxes, "Mogal");
+  EnrollUserHistoryOutput(10, fluxes, "Mo01");
+  EnrollUserHistoryOutput(11, fluxes, "Mo025");
+  EnrollUserHistoryOutput(12, fluxes, "Mo05");
+  EnrollUserHistoryOutput(13, fluxes, "Mo10");
+  EnrollUserHistoryOutput(14, fluxes, "Mo15");
+  EnrollUserHistoryOutput(15, fluxes, "Mota");
+  EnrollUserHistoryOutput(16, fluxes, "Eigal");
+  EnrollUserHistoryOutput(17, fluxes, "Ei01");
+  EnrollUserHistoryOutput(18, fluxes, "Ei025");
+  EnrollUserHistoryOutput(19, fluxes, "Ei05");
+  EnrollUserHistoryOutput(20, fluxes, "Ei10");
+  EnrollUserHistoryOutput(21, fluxes, "Ei15");
+  EnrollUserHistoryOutput(22, fluxes, "Eita");
+  EnrollUserHistoryOutput(23, fluxes, "Eogal");
+  EnrollUserHistoryOutput(24, fluxes, "Eo01");
+  EnrollUserHistoryOutput(25, fluxes, "Eo025");
+  EnrollUserHistoryOutput(26, fluxes, "Eo05");
+  EnrollUserHistoryOutput(27, fluxes, "Eo10");
+  EnrollUserHistoryOutput(28, fluxes, "Eo15");
+  EnrollUserHistoryOutput(29, fluxes, "Eota");
   
   // Enroll user-defined time step constraint
   EnrollUserTimeStepFunction(cooling_timestep);
@@ -502,6 +406,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     if (eta > 0.){
       if(Globals::my_rank==0) std::cout << " turning on AdaptiveWindX1 \n";
       EnrollUserBoundaryFunction(INNER_X1, AdaptiveWindX1);
+    } else if (Mdot_wind >0.){
+      if(Globals::my_rank==0) std::cout << " turning on ConstantWindX1 \n";
+      EnrollUserBoundaryFunction(INNER_X1, ConstantWindX1);
     } else {
       EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1);
     }
@@ -519,10 +426,9 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   // Allocate storage for keeping track of cooling
   AllocateRealUserMeshBlockDataField(2);
-  ruser_meshblock_data[0].NewAthenaArray(3);
+  ruser_meshblock_data[0].NewAthenaArray(2);
   ruser_meshblock_data[0](0) = 0.0;
   ruser_meshblock_data[0](1) = 0.0;
-  ruser_meshblock_data[0](2) = 0.0;
   
   // Allocate storage for keeping track of fluxes
   ruser_meshblock_data[1].NewAthenaArray(28);
@@ -716,10 +622,10 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
 
   // Extract data tables
   AthenaArray<Real> rho_table, pgas_table, edot_cool_table, temperature_table;
-  rho_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[0]);
-  pgas_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[1]);
-  edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
-  temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
+  pgas_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[0]);
+  rho_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[1]);
+  temperature_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[2]);
+  edot_cool_table.InitWithShallowCopy(pmb->pmy_mesh->ruser_mesh_data[3]);
   
   Real phi_ta = grav_pot(rvir);
 
@@ -777,12 +683,15 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
                 + SQR(cons_local(IM2,k,j,i)) + SQR(cons_local(IM3,k,j,i)))
                 / (2.0 * cons_local(IDN,k,j,i));
             Real delta_e = std::min(edot_cool * dt, u);
+            
+            // store the local volumetric cooling rate in out_var_0
             user_out_var_local(0,k,j,i) = edot_cool;
-            // Real vol_cell = (pcoord->x3f(k+1)-pcoord->x3f(k))
-            //                 * (std::cos(pcoord->x2f(j+1)) - std::cos(pcoord->x2f(j)))
-            //                 * (pow(pcoord->x1f(i+1),3) - pow(pcoord->x1f(i),3))/3.;
+
+            
+            // sum up the total amount of cooling
             Real vol_cell = pmb->pcoord->GetCellVolume(k,j,i);
             delta_e_mesh += delta_e * vol_cell;
+            
             // calculate mass flux and place in appropriate holder
             Real mdot = pblock->pcoord->GetFace1Area(k,j,i)*rho*vr;
             Real edot = mdot * (0.5*(SQR(vr)+SQR(vth)+SQR(vph)) + gamma_adi/(gamma_adi-1.0) * pgas/rho + (phi_ta - grav_pot(r)));
@@ -895,7 +804,6 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   // Apply all source terms
   Real delta_e_block = 0.0;
   Real delta_e_ceil = 0.0;
-  Real delta_M_ceil = 0.0;
   for (int k = ks; k <= ke; ++k) {
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
@@ -903,7 +811,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         // Extract primitive and conserved quantities
         const Real &rho_half = prim(IDN,k,j,i);
         const Real &pgas_half = prim(IPR,k,j,i);
-        Real &rho = cons(IDN,k,j,i);
+        const Real &rho = cons(IDN,k,j,i);
         Real &e = cons(IEN,k,j,i);
         Real &m1 = cons(IM1,k,j,i);
         Real &m2 = cons(IM2,k,j,i);
@@ -957,23 +865,11 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             delta_e_ceil += (u - u_max);
           }
         }
-        if ((rho > rho_max) && (temperature(k,j,i) < T_SF)){
-          Real delta_rho = rho-rho_max
-          delta_M_ceil += delta_rho * pmb->pcoord->GetCellVolume(k,j,i);
-          e -= kinetic;
-          m1 *= rho_max/rho;
-          m2 *= rho_max/rho;
-          m3 *= rho_max/rho;
-          rho = rho_max;
-          kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
-          e += kinetic; 
-        }
       }
     }
   }
   pmb->ruser_meshblock_data[0](0) += delta_e_block;
   pmb->ruser_meshblock_data[0](1) += delta_e_ceil;
-  pmb->ruser_meshblock_data[0](2) += delta_M_ceil;
 
   // Free arrays
   rho_table.DeleteAthenaArray();
@@ -1019,8 +915,8 @@ Real CoolingLosses(MeshBlock *pmb, int iout)
 Real fluxes(MeshBlock *pmb, int iout)
 {
   if(Globals::my_rank==0){
-    Real flux = pmb->ruser_meshblock_data[1](iout-3);
-    pmb->ruser_meshblock_data[1](iout-3) = 0.0;
+    Real flux = pmb->ruser_meshblock_data[1](iout-2);
+    pmb->ruser_meshblock_data[1](iout-2) = 0.0;
     return flux;
   } else {
     return 0;
@@ -1424,6 +1320,85 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
     }
   }
     // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+      for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          b.x1f(k,j,(is-i)) = b.x1f(k,j,is);
+        }
+      }}
+
+      for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je+1; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          b.x2f(k,j,(is-i)) = b.x2f(k,j,is);
+        }
+      }}
+
+      for (int k=ks; k<=ke+1; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          b.x3f(k,j,(is-i)) = b.x3f(k,j,is);
+        }
+      }}
+    }
+  return;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief Wind boundary conditions with no inflow, inner x1 boundary
+
+void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  Real rho_out, area;
+  area = SQR(pmb->pmy_mesh->mesh_size.x1min)
+          * (pmb->pmy_mesh->mesh_size.x3max - pmb->pmy_mesh->mesh_size.x3min)
+          * 2.0*(1 - std::cos(opening_angle)); // area = r^2 dphi 2*(cos0 - cos theta)
+  rho_out = Mdot_wind/area/v_wind;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      if ((theta <= opening_angle) || ((PI-theta) <= opening_angle)){
+        for (int i=1; i<=(NGHOST); ++i) {
+          std::cout << " mdot = " << Mdot_in << "\n";
+          prim(IDN,k,j,is-i) = rho_out;
+          prim(IVX,k,j,is-i) = v_wind;
+          prim(IVY,k,j,is-i) = 0.0;
+          prim(IVZ,k,j,is-i) = 0.0;
+          prim(IPR,k,j,is-i) = rho_out*SQR(cs_wind);
+#if MAGNETIC_FIELDS_ENABLED
+          b.x1f(k,j,is-i) = 0.0;
+          b.x2f(k,j,is-i) = 0.0;
+          b.x3f(k,j,is-i) = 0.0;// sqrt(8*PI*rho_out*SQR(cs_wind)/beta); // need to be VERY careful about how to add magnetic fields beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta ) but in code units I think there is a 4 pi 
+#endif
+        }
+      } else {
+        for (int n=0; n<(NHYDRO); ++n) {
+          for (int i=1; i<=(NGHOST); ++i) {
+            Real fp = prim(n,k,j,is) - prim(n,k,j,is+1);
+            Real fpp = prim(n,k,j,is) - 2*prim(n,k,j,is+1) + prim(n,k,j,is+2);
+            prim(n,k,j,is-i) = prim(n,k,j,is) + i*fp + 0.5*SQR(i)*fpp;
+          }  
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
   if (MAGNETIC_FIELDS_ENABLED) {
       for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
