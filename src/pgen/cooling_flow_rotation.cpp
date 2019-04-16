@@ -41,8 +41,6 @@ static Real grav_pot(Real r);
 static const Real mu_m_h = 1.008 * 1.660539040e-24;
 static Real gamma_adi;
 static Real temperature_max;
-static Real rho_table_min, rho_table_max, rho_table_n;
-static Real pgas_table_min, pgas_table_max, pgas_table_n;
 static Real t_cool_start;
 static Real beta;
 static Real grav_scale_inner, aaa, rs_rt, rhom, rho0;
@@ -212,15 +210,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if (MAGNETIC_FIELDS_ENABLED) beta = pin->GetOrAddReal("problem", "beta", 1.0e10);
 
   // Read cooling-table-related parameters from input file
-  rho_table_min = pin->GetReal("problem", "rho_table_min");
-  rho_table_max = pin->GetReal("problem", "rho_table_max");
-  rho_table_n = pin->GetReal("problem", "rho_table_n");
-  pgas_table_min = pin->GetReal("problem", "pgas_table_min");
-  pgas_table_max = pin->GetReal("problem", "pgas_table_max");
-  pgas_table_n = pin->GetReal("problem", "pgas_table_n");
   std::string cooling_file = pin->GetString("problem", "cooling_file");
   Real z_z_solar = pin->GetReal("problem", "relative_metallicity");
-
 
   // Open cooling data file
   hid_t property_list_file = H5Pcreate(H5P_FILE_ACCESS);
@@ -243,21 +234,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     H5Pset_dxpl_mpio(property_list_transfer, H5FD_MPIO_COLLECTIVE);
   }
   #endif
-
-  // // Read solar abundances
-  // double chi_vals[2];
-  // hsize_t dims[1];
-  // dims[0] = 2;
-  // hid_t dataset = H5Dopen(file, "Header/Abundances/Solar_mass_fractions", H5P_DEFAULT);
-  // hid_t dataspace = H5Screate_simple(1, dims, NULL);
-  // H5Dread(dataset, H5T_NATIVE_DOUBLE, dataspace, dataspace, property_list_transfer,
-  //     chi_vals);
-  // H5Dclose(dataset);
-  // H5Sclose(dataspace);
-  // Real chi_h_solar = chi_vals[0];
-  // Real chi_he_solar = chi_vals[1];
-  // Real chi_z_solar = 1.0 - chi_h_solar - chi_he_solar;
-  // Real chi_h = 1.0 - chi_he - z_z_solar * chi_z_solar;
 
   // Read sizes of tables
   int number_of_pressure_bins; 
