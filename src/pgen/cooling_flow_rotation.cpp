@@ -164,7 +164,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real T_wind   = pin->GetOrAddReal("problem", "T_wind", 1.0e4);
   cs_wind       = sqrt(kb*T_wind/(0.62*mp))/vel_scale;
   eta           = pin->GetOrAddReal("problem", "eta", 0.0);
-  Mdot_wind     = pin->GetOrAddReal("problem", "Mdot_wind", 0.0) * Msun / yr / (rho_scale*pow(length,3) / time_scale);
+  Mdot_wind     = pin->GetOrAddReal("problem", "Mdot_wind", 0.0) * Msun / yr / (rho_scale*pow(length_scale,3) / time_scale);
   opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
 
   // SF proxy
