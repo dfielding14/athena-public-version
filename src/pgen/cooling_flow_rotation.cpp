@@ -55,7 +55,7 @@ static Real dt_cutoff, cfl_cool;
 static Real pfloor, dfloor, vceil;
 
 static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
-static Real rho_wind, v_wind, cs_wind, eta;
+static Real rho_wind, v_wind, cs_wind, eta,Mdot_wind, opening_angle;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs,f2;
 static Real T_SF, rho_max;
@@ -73,6 +73,8 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 
 // static Real dt_drive; // the duration of driving
@@ -162,6 +164,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real T_wind   = pin->GetOrAddReal("problem", "T_wind", 1.0e4);
   cs_wind       = sqrt(kb*T_wind/(0.62*mp))/vel_scale;
   eta           = pin->GetOrAddReal("problem", "eta", 0.0);
+  Mdot_wind     = pin->GetOrAddReal("problem", "Mdot_wind", 0.0) * Msun / yr / (rho_scale*pow(length_scale,3) / time_scale);
+  opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
 
   // SF proxy
   Real n_max       = pin->GetOrAddReal("problem", "n_max", 1.0e20);
@@ -502,6 +506,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     if (eta > 0.){
       if(Globals::my_rank==0) std::cout << " turning on AdaptiveWindX1 \n";
       EnrollUserBoundaryFunction(INNER_X1, AdaptiveWindX1);
+    } else if (Mdot_wind >0.){
+      if(Globals::my_rank==0) std::cout << " turning on ConstantWindX1 \n";
+      EnrollUserBoundaryFunction(INNER_X1, ConstantWindX1);
     } else {
       EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1);
     }
@@ -1451,3 +1458,71 @@ void AdaptiveWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 }
 
 
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief Wind boundary conditions with no inflow, inner x1 boundary
+
+void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  Real rho_out, area;
+  area = SQR(pmb->pmy_mesh->mesh_size.x1min)
+          * (pmb->pmy_mesh->mesh_size.x3max - pmb->pmy_mesh->mesh_size.x3min)
+          * 2.0*(1 - std::cos(opening_angle)); // area = r^2 dphi 2*(cos0 - cos theta)
+  rho_out = Mdot_wind/area/v_wind;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      Real theta = pco->x2v(j);
+      if ((theta <= opening_angle) || ((PI-theta) <= opening_angle)){
+        for (int i=1; i<=(NGHOST); ++i) {
+          prim(IDN,k,j,is-i) = rho_out;
+          prim(IVX,k,j,is-i) = v_wind;
+          prim(IVY,k,j,is-i) = 0.0;
+          prim(IVZ,k,j,is-i) = 0.0;
+          prim(IPR,k,j,is-i) = rho_out*SQR(cs_wind);
+#if MAGNETIC_FIELDS_ENABLED
+          b.x1f(k,j,is-i) = 0.0;
+          b.x2f(k,j,is-i) = 0.0;
+          b.x3f(k,j,is-i) = 0.0;// sqrt(8*PI*rho_out*SQR(cs_wind)/beta); // need to be VERY careful about how to add magnetic fields beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta ) but in code units I think there is a 4 pi 
+#endif
+        }
+      } else {
+        for (int n=0; n<(NHYDRO); ++n) {
+          for (int i=1; i<=(NGHOST); ++i) {
+            Real fp = prim(n,k,j,is) - prim(n,k,j,is+1);
+            Real fpp = prim(n,k,j,is) - 2*prim(n,k,j,is+1) + prim(n,k,j,is+2);
+            prim(n,k,j,is-i) = prim(n,k,j,is) + i*fp + 0.5*SQR(i)*fpp;
+          }  
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+      for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          b.x1f(k,j,(is-i)) = b.x1f(k,j,is);
+        }
+      }}
+
+      for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je+1; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          b.x2f(k,j,(is-i)) = b.x2f(k,j,is);
+        }
+      }}
+
+      for (int k=ks; k<=ke+1; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          b.x3f(k,j,(is-i)) = b.x3f(k,j,is);
+        }
+      }}
+    }
+  return;
+}
