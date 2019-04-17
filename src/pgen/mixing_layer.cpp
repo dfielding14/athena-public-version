@@ -18,6 +18,7 @@
 #include "../field/field.hpp"              // Field
 #include "../hydro/hydro.hpp"              // Hydro
 #include "../fft/turbulence.hpp"           // Turbulence
+#include "../hydro/hydro_diffusion/hydro_diffusion.hpp" // diffusion
 
 // External library headers
 #include <hdf5.h>  // H5*, hid_t, hsize_t, H5*()
@@ -1224,7 +1225,7 @@ void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const
 
         S_norm = sqrt(pow(dvel2_dx1 + dvel1_dx2,2) + pow(dvel3_dx1 + dvel1_dx3,2) + pow(dvel3_dx2 + dvel2_dx3,2) + 
                       (4/3.*(pow(dvel1_dx1,2) + pow(dvel2_dx2,2) + pow(dvel3_dx3,2)
-                             -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)))
+                             -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)));
 
         phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm;
       }
@@ -1264,7 +1265,7 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 
         S_norm = sqrt(pow(dvel2_dx1 + dvel1_dx2,2) + pow(dvel3_dx1 + dvel1_dx3,2) + pow(dvel3_dx2 + dvel2_dx3,2) + 
                       (4/3.*(pow(dvel1_dx1,2) + pow(dvel2_dx2,2) + pow(dvel3_dx3,2)
-                             -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)))
+                             -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
       }
