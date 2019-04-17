@@ -1475,6 +1475,7 @@ void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   rho_out = Mdot_wind/area/v_wind;
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
+      Real theta = pco->x2v(j);
       if ((theta <= opening_angle) || ((PI-theta) <= opening_angle)){
         for (int i=1; i<=(NGHOST); ++i) {
           std::cout << " mdot = " << Mdot_in << "\n";
