@@ -967,11 +967,11 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
         if ((rho > rho_max) && (temperature(k,j,i) < T_SF) && (pmb->pcoord->x1v(i) < 2.0*r_circ)){
           Real delta_rho = rho-rho_max;
           delta_M_ceil += delta_rho * pmb->pcoord->GetCellVolume(k,j,i);
-          e -= kinetic;
+          e  -= kinetic;
           m1 *= rho_max/rho; // keep the velocity the same
           m2 *= rho_max/rho;
           m3 *= rho_max/rho;
-          e *= rho/rho_max;  // keep the temperature the same
+          e  *= rho_max/rho; // keep the temperature the same
           rho = rho_max;
           kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
           e += kinetic; 
