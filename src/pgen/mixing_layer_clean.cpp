@@ -370,7 +370,7 @@ static Real edot_cool(Real press, Real dens)
   Real M = std::log(Tmix) + SQR(s_Lambda);
   Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
   Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
-  return log_normal-log_normal_min;
+  return Lambda_cool * SQR(dens) * (log_normal-log_normal_min);
 }
 
 
