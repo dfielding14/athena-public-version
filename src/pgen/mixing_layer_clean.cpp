@@ -266,6 +266,9 @@ Real cooling_timestep(MeshBlock *pmb)
           Real dens = pmb->phydro->w(IDN,k,j,i);
           Real edot = fabs(edot_cool(press,dens));
           dt = cfl_cool * 1.5*press/edot;
+          if(Globals::my_rank==0) {
+            std::cout << "dt " << dt << " edot " << edot << " press " << press << " dens " << dens << "\n";
+          }
           dt = std::max( dt , dt_cutoff );
           min_dt = std::min(min_dt, dt);
         }
