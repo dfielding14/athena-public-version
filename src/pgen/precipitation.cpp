@@ -729,10 +729,10 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           Real &e = cons(IEN,k,j,i);
           Real &rho = cons(IDN,k,j,i);
           if (density_weighted_winds){
-            e += mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
+            e += -1.*mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
           } 
           if (volume_weighted_winds){
-            e += mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
+            e += -1.*mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
           }
         }
       }
