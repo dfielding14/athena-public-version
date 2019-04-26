@@ -56,6 +56,8 @@ static Real cs, rho_ta, f_cs;
 static Real Mdot_in, Mdot_out;
 
 static Real r_inner, r_outer;
+static Real alpha_wind;
+static bool density_weighted_winds, volume_weighted_winds;
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
@@ -154,6 +156,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   cs_wind       = sqrt(kb*T_wind/(0.62*mp))/vel_scale;
   eta           = pin->GetOrAddReal("problem", "eta", 0.0);
   opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
+  alpha_wind    = pin->GetOrAddReal("problem", "alpha_wind", -2.0); 
+
+  density_weighted_winds = pin->GetOrAddBoolean("problem", "density_weighted_winds", false);
+  volume_weighted_winds = pin->GetOrAddBoolean("problem", "volume_weighted_winds", false);
 
   // Gravity
   Mhalo        = pin->GetReal("problem", "Mhalo"); // in Msun
@@ -711,6 +717,27 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   Mdot_in = mdot_global[0];
   Mdot_out = mdot_global[1];
   std::cout << " mdot = " << Mdot_in << "\n";
+
+
+  for (int k = ks; k <= ke; ++k) {
+    for (int j = js; j <= je; ++j) {
+      for (int i = is; i <= ie; ++i) {
+        // heating
+        Real r = pmb->pcoord->x1v(i);
+        Real &e = cons(IEN,k,j,i);
+        Real &rho = cons(IDN,k,j,i);
+        if (density_weighted_winds){
+          e += Mdot_in * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
+        } 
+        if (volume_weighted_winds){
+          e += Mdot_in * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
+        }
+      }
+    }
+  }
+
+
+
 
   // Free arrays
   rho_table.DeleteAthenaArray();
