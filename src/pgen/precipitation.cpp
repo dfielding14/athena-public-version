@@ -58,6 +58,7 @@ static Real Mdot_in, Mdot_out;
 static Real r_inner, r_outer;
 static Real alpha_wind;
 static bool density_weighted_winds, volume_weighted_winds;
+static Real t_feedback_start;
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
@@ -157,6 +158,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   eta           = pin->GetOrAddReal("problem", "eta", 0.0);
   opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
   alpha_wind    = pin->GetOrAddReal("problem", "alpha_wind", -2.0); 
+  t_feedback_start = pin->GetReal("problem", "t_feedback_start");
 
   density_weighted_winds = pin->GetOrAddBoolean("problem", "density_weighted_winds", false);
   volume_weighted_winds = pin->GetOrAddBoolean("problem", "volume_weighted_winds", false);
@@ -718,19 +720,20 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   Mdot_out = mdot_global[1];
   std::cout << " mdot = " << Mdot_in << "\n";
 
-
-  for (int k = ks; k <= ke; ++k) {
-    for (int j = js; j <= je; ++j) {
-      for (int i = is; i <= ie; ++i) {
-        // heating
-        Real r = pmb->pcoord->x1v(i);
-        Real &e = cons(IEN,k,j,i);
-        Real &rho = cons(IDN,k,j,i);
-        if (density_weighted_winds){
-          e += Mdot_in * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
-        } 
-        if (volume_weighted_winds){
-          e += Mdot_in * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
+  if (t > t_feedback_start){
+    for (int k = ks; k <= ke; ++k) {
+      for (int j = js; j <= je; ++j) {
+        for (int i = is; i <= ie; ++i) {
+          // heating
+          Real r = pmb->pcoord->x1v(i);
+          Real &e = cons(IEN,k,j,i);
+          Real &rho = cons(IDN,k,j,i);
+          if (density_weighted_winds){
+            e += mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
+          } 
+          if (volume_weighted_winds){
+            e += mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
+          }
         }
       }
     }
