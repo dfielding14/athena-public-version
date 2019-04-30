@@ -750,7 +750,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
   pmb->ruser_meshblock_data[0](3) = mdot_global[1];
   Mdot_in = mdot_global[0];
   Mdot_out = mdot_global[1];
-  std::cout << " mdot = " << Mdot_in << "\n";
+  // std::cout << " mdot = " << Mdot_in << "\n";
 
   if (t > t_feedback_start){
     for (int k = ks; k <= ke; ++k) {
@@ -761,10 +761,10 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
           Real &e = cons(IEN,k,j,i);
           Real &rho = cons(IDN,k,j,i);
           if (density_weighted_winds){
-            e += mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
+            e += -1.*mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) * rho;
           } 
           if (volume_weighted_winds){
-            e += mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
+            e += -1.*mdot_global[0] * SQR(cs_wind) * pow(r/r_inner, alpha_wind) / pmb->pcoord->GetCellVolume(k,j,i);
           }
         }
       }
