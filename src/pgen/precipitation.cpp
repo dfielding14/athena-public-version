@@ -1273,7 +1273,7 @@ void SmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArr
           0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1)+SQR(dvel1_dx2)+SQR(dvel3_dx2)+SQR(dvel1_dx3)+SQR(dvel2_dx3)) +
           dvel2_dx1*dvel1_dx2 + dvel3_dx1*dvel1_dx3 + dvel2_dx3*dvel3_dx2));
 
-        phdif->nu(ISO,k,j,i) = phdif->nu_iso/SQR(pmb->pcoord->dx1v(i)) * S_norm;
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso*SQR(pmb->pcoord->dx1v(i)) * S_norm;
       }
     }
   }
@@ -1313,7 +1313,7 @@ void SmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaAr
           0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1)+SQR(dvel1_dx2)+SQR(dvel3_dx2)+SQR(dvel1_dx3)+SQR(dvel2_dx3)) +
           dvel2_dx1*dvel1_dx2 + dvel3_dx1*dvel1_dx3 + dvel2_dx3*dvel3_dx2));
 
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/SQR(pmb->pcoord->dx1v(i)) * S_norm;
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso*SQR(pmb->pcoord->dx1v(i)) * S_norm;
       }
     }
   }
@@ -1356,7 +1356,7 @@ void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const
                       (4/3.*(pow(dvel1_dx1,2) + pow(dvel2_dx2,2) + pow(dvel3_dx3,2)
                              -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)));
 
-        phdif->nu(ISO,k,j,i) = phdif->nu_iso/SQR(pmb->pcoord->dx1v(i)) * S_norm;
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso*SQR(pmb->pcoord->dx1v(i)) * S_norm;
       }
     }
   }
@@ -1396,7 +1396,7 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
                       (4/3.*(pow(dvel1_dx1,2) + pow(dvel2_dx2,2) + pow(dvel3_dx3,2)
                              -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)));
 
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/SQR(pmb->pcoord->dx1v(i)) * S_norm;
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso*SQR(pmb->pcoord->dx1v(i)) * S_norm;
       }
     }
   }
