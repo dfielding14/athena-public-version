@@ -288,6 +288,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
   int B_direction = pin->GetOrAddInteger("problem", "B_direction", 0); // 0 = x, 1 = y, 2 = z
 
+  if(Globals::my_rank==0) {
+    std::cout << "bulk_velocity_z = " << bulk_velocity_z << "\n";
+  }
+
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     Real z = pcoord->x3v(k);
@@ -337,6 +341,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     AthenaArray<Real> b;
     peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   }
+
+  if(Globals::my_rank==0) {
+    std::cout << "done initializing "  << "\n";
+  } 
   return;
 }
 
