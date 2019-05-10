@@ -62,6 +62,7 @@ static Real smoothing_thickness, velocity_pert, lambda_pert, z_top, z_bot;
 
 static int nstages;
 static Real weights[4];
+static Real bulk_velocity_z,scale_temperature;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -113,11 +114,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Get the number of stages based on the integrator
   
-  std::string integrator = pin->GetString("time", "integrator");
+  std::string integrator_name = pin->GetString("time", "integrator");
 
-  if ((integrator == 'rk2')||(integrator == 'vl2')){
+  if ((integrator_name.compare('rk2') == 0 )||(integrator_name.compare('vl2') == 0 )){
     nstages = 2;
-    if (integrator == 'rk2'){
+    if (integrator_name.compare('rk2') == 0 ){
       weights[0]=0.5;
       weights[1]=0.5;
       weights[2]=0.0;
@@ -129,14 +130,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
       weights[3]=0.0;
     }
   }
-  if (integrator == 'rk3'){
+  if (integrator_name.compare('rk3') == 0 ){
     nstages = 3;
     weights[0]=1./6.;
     weights[1]=1./6.;
     weights[2]=2./3.;
     weights[3]=0.0;
   }
-  if (integrator == 'rk4'){
+  if (integrator_name.compare('rk4') == 0 ){
     nstages = 4;
     weights[0]=1./6.;
     weights[1]=1./3.;
