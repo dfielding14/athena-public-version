@@ -116,9 +116,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   
   std::string integrator_name = pin->GetString("time", "integrator");
 
-  if ((integrator_name.compare('rk2') == 0 )||(integrator_name.compare('vl2') == 0 )){
+  std::string vl2 ("vl2");
+  std::string rk2 ("rk2");
+  std::string rk3 ("rk3");
+  std::string rk4 ("rk4");
+ 
+  if ((integrator_name.compare(rk2) == 0 )||(integrator_name.compare(vl2) == 0 )){
     nstages = 2;
-    if (integrator_name.compare('rk2') == 0 ){
+    if (integrator_name.compare(rk2) == 0 ){
       weights[0]=0.5;
       weights[1]=0.5;
       weights[2]=0.0;
@@ -130,14 +135,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
       weights[3]=0.0;
     }
   }
-  if (integrator_name.compare('rk3') == 0 ){
+  if (integrator_name.compare(rk3) == 0 ){
     nstages = 3;
     weights[0]=1./6.;
     weights[1]=1./6.;
     weights[2]=2./3.;
     weights[3]=0.0;
   }
-  if (integrator_name.compare('rk4') == 0 ){
+  if (integrator_name.compare(rk4) == 0 ){
     nstages = 4;
     weights[0]=1./6.;
     weights[1]=1./3.;
