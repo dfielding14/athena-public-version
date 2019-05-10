@@ -446,12 +446,13 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_h += kinetic * vol_cell;
           Eth_h += (u+delta_e) * vol_cell;
           if ((zfb == zbottom)||(zft == ztop)){
-            dM_h += m3 * area_cell;
-            Px_h += m1 * m3/rho * area_cell;
-            Py_h += m2 * m3/rho * area_cell;
-            Pz_h += m3 * m3/rho * area_cell;
-            Ek_h += kinetic * m3/rho *area_cell;
-            Eth_h += (u+delta_e) * m3/rho * area_cell;
+            Real sign = (zft == ztop)? -1.0 : 1.0;
+            dM_h += sign * m3 * area_cell;
+            Px_h += sign * m1 * m3/rho * area_cell;
+            Py_h += sign * m2 * m3/rho * area_cell;
+            Pz_h += sign * m3 * m3/rho * area_cell;
+            Ek_h += sign * kinetic * m3/rho *area_cell;
+            Eth_h += sign * (u+delta_e) * m3/rho * area_cell;
           }
         } else if (T<Tlow){
           M_c += rho * vol_cell;
@@ -461,12 +462,13 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_c += kinetic * vol_cell;
           Eth_c += (u+delta_e) * vol_cell;
           if ((zfb == zbottom)||(zft == ztop)){
-            dM_c += m3 * area_cell;
-            Px_c += m1 * m3/rho * area_cell;
-            Py_c += m2 * m3/rho * area_cell;
-            Pz_c += m3 * m3/rho * area_cell;
-            Ek_c += kinetic * m3/rho *area_cell;
-            Eth_c += (u+delta_e) * m3/rho * area_cell;
+            Real sign = (zft == ztop)? -1.0 : 1.0;
+            dM_c += sign * m3 * area_cell;
+            Px_c += sign * m1 * m3/rho * area_cell;
+            Py_c += sign * m2 * m3/rho * area_cell;
+            Pz_c += sign * m3 * m3/rho * area_cell;
+            Ek_c += sign * kinetic * m3/rho *area_cell;
+            Eth_c += sign * (u+delta_e) * m3/rho * area_cell;
           }
         } else {
           M_i += rho * vol_cell;
@@ -476,12 +478,13 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_i += kinetic * vol_cell;
           Eth_i += (u+delta_e) * vol_cell;
           if ((zfb == zbottom)||(zft == ztop)){
-            dM_i += m3 * area_cell;
-            Px_i += m1 * m3/rho * area_cell;
-            Py_i += m2 * m3/rho * area_cell;
-            Pz_i += m3 * m3/rho * area_cell;
-            Ek_i += kinetic * m3/rho *area_cell;
-            Eth_i += (u+delta_e) * m3/rho * area_cell;
+            Real sign = (zft == ztop)? -1.0 : 1.0;
+            dM_i += sign * m3 * area_cell;
+            Px_i += sign * m1 * m3/rho * area_cell;
+            Py_i += sign * m2 * m3/rho * area_cell;
+            Pz_i += sign * m3 * m3/rho * area_cell;
+            Ek_i += sign * kinetic * m3/rho *area_cell;
+            Eth_i += sign * (u+delta_e) * m3/rho * area_cell;
           }
         }
         e_cool += delta_e;
