@@ -99,6 +99,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   bulk_velocity_z        = pin->GetOrAddReal("problem", "bulk_velocity_z", 0.0); // for testing
   scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
 
+  // Read cooling-table-related parameters from input file
+  t_cool_start = pin->GetReal("problem", "t_cool_start");
+  dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
+  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
+  Lambda_cool = pin->GetReal("problem", "Lambda_cool");
+  s_Lambda = pin->GetReal("problem", "s_Lambda");
+
   Tmin = pgas_0/rho_0 / density_contrast;
   Tmax = pgas_0/rho_0;
   Tmix = sqrt(Tmin*Tmax);
@@ -106,12 +113,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Thigh = sqrt(Tmix*Tmax);
   M = std::log(Tmix) + SQR(s_Lambda);
 
-  // Read cooling-table-related parameters from input file
-  t_cool_start = pin->GetReal("problem", "t_cool_start");
-  dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
-  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
-  Lambda_cool = pin->GetReal("problem", "Lambda_cool");
-  s_Lambda = pin->GetReal("problem", "s_Lambda");
 
   //
   zbottom = mesh_size.x3min;
