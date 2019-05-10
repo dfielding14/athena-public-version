@@ -26,7 +26,7 @@
 // Declarations
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage);
-Real CoolingLosses(MeshBlock *pmb, int iout);
+Real history_recorder(MeshBlock *pmb, int iout);
 static Real edot_cool(Real press, Real dens);
 
 
@@ -54,6 +54,7 @@ static Real gamma_adi;
 static Real rho_0, pgas_0;
 static Real density_contrast,velocity;
 static Real Lambda_cool, s_Lambda, t_cool_start;
+static Real Tmin,Tmax,Tmix,Tlow,Thigh,M;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
@@ -90,6 +91,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   pgas_0                 = pin->GetReal("problem", "pgas_0");
   density_contrast       = pin->GetReal("problem", "density_contrast");
   velocity               = pin->GetReal("problem", "velocity");
+  Tmin = pgas_0/rho_0 / density_contrast;
+  Tmax = pgas_0/rho_0;
+  Tmix = sqrt(Tmin*Tmax);
+  Tlow = sqrt(Tmin*Tmix);
+  Thigh = sqrt(Tmix*Tmax);
+  M = std::log(Tmix) + SQR(s_Lambda);
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
@@ -105,22 +112,48 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   z_top               = pin->GetReal("problem", "z_top");
   z_bot               = pin->GetReal("problem", "z_bot");
 
-  // Allocate fixed cooling table
-  AllocateRealUserMeshDataField(1);
-  ruser_mesh_data[0].NewAthenaArray(3); // delta_e_tot, vol_tot, vol_cell
-
-  Real vol_tot = (mesh_size.x1max - mesh_size.x1min)
-               * (mesh_size.x2max - mesh_size.x2min) 
-               * (mesh_size.x3max - mesh_size.x3min);
-  Real vol_cell = vol_tot / mesh_size.nx1 / mesh_size.nx2 / mesh_size.nx3;
-  ruser_mesh_data[0](1) = vol_tot;
-  ruser_mesh_data[0](2) = vol_cell;
-
   // Enroll user-defined functions
   EnrollUserExplicitSourceFunction(Cooling_Source_Function);
-  AllocateUserHistoryOutput(2);
-  EnrollUserHistoryOutput(0, CoolingLosses, "e_cool");
-  EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
+  AllocateUserHistoryOutput(38);
+  EnrollUserHistoryOutput(0, history_recorder, "e_cool");
+  EnrollUserHistoryOutput(1, history_recorder, "e_ceil");
+  EnrollUserHistoryOutput(2, history_recorder, "M_h");
+  EnrollUserHistoryOutput(3, history_recorder, "M_i");
+  EnrollUserHistoryOutput(4, history_recorder, "M_c");
+  EnrollUserHistoryOutput(5, history_recorder, "dM_h");
+  EnrollUserHistoryOutput(6, history_recorder, "dM_i");
+  EnrollUserHistoryOutput(7, history_recorder, "dM_c");
+  EnrollUserHistoryOutput(8, history_recorder, "Px_h");
+  EnrollUserHistoryOutput(9, history_recorder, "Px_i");
+  EnrollUserHistoryOutput(10, history_recorder, "Px_c");
+  EnrollUserHistoryOutput(11, history_recorder, "dPx_h");
+  EnrollUserHistoryOutput(12, history_recorder, "dPx_i");
+  EnrollUserHistoryOutput(13, history_recorder, "dPx_c");
+  EnrollUserHistoryOutput(14, history_recorder, "Py_h");
+  EnrollUserHistoryOutput(15, history_recorder, "Py_i");
+  EnrollUserHistoryOutput(16, history_recorder, "Py_c");
+  EnrollUserHistoryOutput(17, history_recorder, "dPy_h");
+  EnrollUserHistoryOutput(18, history_recorder, "dPy_i");
+  EnrollUserHistoryOutput(19, history_recorder, "dPy_c");
+  EnrollUserHistoryOutput(20, history_recorder, "Pz_h");
+  EnrollUserHistoryOutput(21, history_recorder, "Pz_i");
+  EnrollUserHistoryOutput(22, history_recorder, "Pz_c");
+  EnrollUserHistoryOutput(23, history_recorder, "dPz_h");
+  EnrollUserHistoryOutput(24, history_recorder, "dPz_i");
+  EnrollUserHistoryOutput(25, history_recorder, "dPz_c");
+  EnrollUserHistoryOutput(26, history_recorder, "Ek_h");
+  EnrollUserHistoryOutput(27, history_recorder, "Ek_i");
+  EnrollUserHistoryOutput(28, history_recorder, "Ek_c");
+  EnrollUserHistoryOutput(29, history_recorder, "dEk_h");
+  EnrollUserHistoryOutput(30, history_recorder, "dEk_i");
+  EnrollUserHistoryOutput(31, history_recorder, "dEk_c");
+  EnrollUserHistoryOutput(32, history_recorder, "Eth_h");
+  EnrollUserHistoryOutput(33, history_recorder, "Eth_i");
+  EnrollUserHistoryOutput(34, history_recorder, "Eth_c");
+  EnrollUserHistoryOutput(35, history_recorder, "dEth_h");
+  EnrollUserHistoryOutput(36, history_recorder, "dEth_i");
+  EnrollUserHistoryOutput(37, history_recorder, "dEth_c");
+
   EnrollUserTimeStepFunction(cooling_timestep);
 
   // Enroll user-defined conduction and viscosity
@@ -301,11 +334,18 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
   int ke = pmb->ke;
 
   // Apply all source terms
-  Real delta_e_block = 0.0;
+  Real e_cool = 0.0;
+  Real M_h=0.0, M_i=0.0, M_c=0.0, dM_h=0.0, dM_i=0.0, dM_c=0.0;
+  Real Px_h=0.0, Px_i=0.0, Px_c=0.0, dPx_h=0.0, dPx_i=0.0, dPx_c=0.0;
+  Real Py_h=0.0, Py_i=0.0, Py_c=0.0, dPy_h=0.0, dPy_i=0.0, dPy_c=0.0;
+  Real Pz_h=0.0, Pz_i=0.0, Pz_c=0.0, dPz_h=0.0, dPz_i=0.0, dPz_c=0.0;
+  Real Ek_h=0.0, Ek_i=0.0, Ek_c=0.0, dEk_h=0.0, dEk_i=0.0, dEk_c=0.0;
+  Real Eth_h=0.0, Eth_i=0.0, Eth_c=0.0, dEth_h=0.0, dEth_i=0.0, dEth_c=0.0;
   for (int k = ks; k <= ke; ++k) {
+    Real zfb = pcoord->x3f(k);
+    Real zft = pcoord->x3f(k+1);
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
-
         // Extract primitive and conserved quantities
         const Real &rho_half = prim(IDN,k,j,i);
         const Real &pgas_half = prim(IPR,k,j,i);
@@ -330,13 +370,100 @@ if (MAGNETIC_FIELDS_ENABLED) {
         if (t > t_cool_start){
           e += delta_e;
         }
-        if (stage == 2) {
-          delta_e_block += delta_e;
+
+        // M_h M_i M_c dM_h dM_i dM_c Px_h Px_i Px_c dPx_h dPx_i dPx_c Py_h Py_i Py_c dPy_h dPy_i dPy_c Pz_h Pz_i Pz_c dPz_h dPz_i dPz_c Ek_h Ek_i Ek_c dEk_h dEk_i dEk_c Eth_h Eth_i Eth_c dEth_h dEth_i dEth_c
+        // I am not exactly sure which variables at which point in the stage i should be using for the calculation of T
+        Real T = (2./3.) * (u+delta_e) / rho;
+        Real area_cell = pmb->pcoord->dx1f(i)*pmb->pcoord->dx2f(j);
+        Real vol_cell = area_cell*pmb->pcoord->dx3f(k);
+        if (T > Thigh){
+          M_h += rho * vol_cell;
+          Px_h += m1 * vol_cell;
+          Py_h += m2 * vol_cell;
+          Pz_h += m3 * vol_cell;
+          Ek_h += kinetic * vol_cell;
+          Eth_h += (u+delta_e) * vol_cell;
+          if ((zfb == mesh_size.x3min)||(zft == mesh_size.x3max)){
+            dM_h += m3 * area_cell;
+            Px_h += m1 * m3/rho * area_cell;
+            Py_h += m2 * m3/rho * area_cell;
+            Pz_h += m3 * m3/rho * area_cell;
+            Ek_h += kinetic * m3/rho *area_cell;
+            Eth_h += (u+delta_e) * m3/rho * area_cell;
+          }
+        } else if (T<Tlow){
+          M_c += rho * vol_cell;
+          Px_c += m1 * vol_cell;
+          Py_c += m2 * vol_cell;
+          Pz_c += m3 * vol_cell;
+          Ek_c += kinetic * vol_cell;
+          Eth_c += (u+delta_e) * vol_cell;
+          if ((zfb == mesh_size.x3min)||(zft == mesh_size.x3max)){
+            dM_c += m3 * area_cell;
+            Px_c += m1 * m3/rho * area_cell;
+            Py_c += m2 * m3/rho * area_cell;
+            Pz_c += m3 * m3/rho * area_cell;
+            Ek_c += kinetic * m3/rho *area_cell;
+            Eth_c += (u+delta_e) * m3/rho * area_cell;
+          }
+        } else {
+          M_i += rho * vol_cell;
+          Px_i += m1 * vol_cell;
+          Py_i += m2 * vol_cell;
+          Pz_i += m3 * vol_cell;
+          Ek_i += kinetic * vol_cell;
+          Eth_i += (u+delta_e) * vol_cell;
+          if ((zfb == mesh_size.x3min)||(zft == mesh_size.x3max)){
+            dM_i += m3 * area_cell;
+            Px_i += m1 * m3/rho * area_cell;
+            Py_i += m2 * m3/rho * area_cell;
+            Pz_i += m3 * m3/rho * area_cell;
+            Ek_i += kinetic * m3/rho *area_cell;
+            Eth_i += (u+delta_e) * m3/rho * area_cell;
+          }
         }
+        e_cool += delta_e;
       }
     }
   }
-  pmb->ruser_meshblock_data[0](0) += delta_e_block;
+  pmb->ruser_meshblock_data[0](0) += e_cool;
+  pmb->ruser_meshblock_data[0](2) += M_h;
+  pmb->ruser_meshblock_data[0](3) += M_i;
+  pmb->ruser_meshblock_data[0](4) += M_c;
+  pmb->ruser_meshblock_data[0](5) += dM_h;
+  pmb->ruser_meshblock_data[0](6) += dM_i;
+  pmb->ruser_meshblock_data[0](7) += dM_c;
+  pmb->ruser_meshblock_data[0](8) += Px_h;
+  pmb->ruser_meshblock_data[0](9) += Px_i;
+  pmb->ruser_meshblock_data[0](10) += Px_c;
+  pmb->ruser_meshblock_data[0](11) += dPx_h;
+  pmb->ruser_meshblock_data[0](12) += dPx_i;
+  pmb->ruser_meshblock_data[0](13) += dPx_c;
+  pmb->ruser_meshblock_data[0](14) += Py_h;
+  pmb->ruser_meshblock_data[0](15) += Py_i;
+  pmb->ruser_meshblock_data[0](16) += Py_c;
+  pmb->ruser_meshblock_data[0](17) += dPy_h;
+  pmb->ruser_meshblock_data[0](18) += dPy_i;
+  pmb->ruser_meshblock_data[0](19) += dPy_c;
+  pmb->ruser_meshblock_data[0](20) += Pz_h;
+  pmb->ruser_meshblock_data[0](21) += Pz_i;
+  pmb->ruser_meshblock_data[0](22) += Pz_c;
+  pmb->ruser_meshblock_data[0](23) += dPz_h;
+  pmb->ruser_meshblock_data[0](24) += dPz_i;
+  pmb->ruser_meshblock_data[0](25) += dPz_c;
+  pmb->ruser_meshblock_data[0](26) += Ek_h;
+  pmb->ruser_meshblock_data[0](27) += Ek_i;
+  pmb->ruser_meshblock_data[0](28) += Ek_c;
+  pmb->ruser_meshblock_data[0](29) += dEk_h;
+  pmb->ruser_meshblock_data[0](30) += dEk_i;
+  pmb->ruser_meshblock_data[0](31) += dEk_c;
+  pmb->ruser_meshblock_data[0](32) += Eth_h;
+  pmb->ruser_meshblock_data[0](33) += Eth_i;
+  pmb->ruser_meshblock_data[0](34) += Eth_c;
+  pmb->ruser_meshblock_data[0](35) += dEth_h;
+  pmb->ruser_meshblock_data[0](36) += dEth_i;
+  pmb->ruser_meshblock_data[0](37) += dEth_c;
+
   return;
 }
 
@@ -353,7 +480,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
 //     0: physical radiative losses
 //     1: numerical temperature ceiling
 
-Real CoolingLosses(MeshBlock *pmb, int iout)
+Real history_recorder(MeshBlock *pmb, int iout)
 {
   Real delta_e = pmb->ruser_meshblock_data[0](iout);
   pmb->ruser_meshblock_data[0](iout) = 0.0;
@@ -366,14 +493,10 @@ Real CoolingLosses(MeshBlock *pmb, int iout)
 
 static Real edot_cool(Real press, Real dens)
 {
-  Real Tmin = pgas_0/rho_0 / density_contrast;
-  Real Tmax = pgas_0/rho_0;
-  Real Tmix = sqrt(Tmin*Tmax);
   Real T = press/dens;
-  Real M = std::log(Tmix) + SQR(s_Lambda);
   Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
   Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
-  return Lambda_cool * SQR(dens) * (log_normal-log_normal_min);
+  return Lambda_cool * SQR(dens) * std::max(log_normal-log_normal_min,0.0);
 }
 
 
