@@ -63,6 +63,7 @@ static Real smoothing_thickness, velocity_pert, lambda_pert, z_top, z_bot;
 static int nstages;
 static Real weights[4];
 static Real bulk_velocity_z,scale_temperature;
+static Real ztop, zbottom;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -112,8 +113,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Lambda_cool = pin->GetReal("problem", "Lambda_cool");
   s_Lambda = pin->GetReal("problem", "s_Lambda");
 
+  //
+  zbottom = mesh_size.x3min;
+  ztop = mesh_size.x3max;
+
   // Get the number of stages based on the integrator
-  
   std::string integrator_name = pin->GetString("time", "integrator");
 
   std::string vl2 ("vl2");
@@ -397,8 +401,8 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
   Real Ek_h=0.0, Ek_i=0.0, Ek_c=0.0, dEk_h=0.0, dEk_i=0.0, dEk_c=0.0;
   Real Eth_h=0.0, Eth_i=0.0, Eth_c=0.0, dEth_h=0.0, dEth_i=0.0, dEth_c=0.0;
   for (int k = ks; k <= ke; ++k) {
-    Real zfb = pcoord->x3f(k);
-    Real zft = pcoord->x3f(k+1);
+    Real zfb = pmb->pcoord->x3f(k);
+    Real zft = pmb->pcoord->x3f(k+1);
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
         // Extract primitive and conserved quantities
@@ -438,7 +442,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Pz_h += m3 * vol_cell;
           Ek_h += kinetic * vol_cell;
           Eth_h += (u+delta_e) * vol_cell;
-          if ((zfb == mesh_size.x3min)||(zft == mesh_size.x3max)){
+          if ((zfb == zbottom)||(zft == ztop)){
             dM_h += m3 * area_cell;
             Px_h += m1 * m3/rho * area_cell;
             Py_h += m2 * m3/rho * area_cell;
@@ -453,7 +457,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Pz_c += m3 * vol_cell;
           Ek_c += kinetic * vol_cell;
           Eth_c += (u+delta_e) * vol_cell;
-          if ((zfb == mesh_size.x3min)||(zft == mesh_size.x3max)){
+          if ((zfb == zbottom)||(zft == ztop)){
             dM_c += m3 * area_cell;
             Px_c += m1 * m3/rho * area_cell;
             Py_c += m2 * m3/rho * area_cell;
@@ -468,7 +472,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Pz_i += m3 * vol_cell;
           Ek_i += kinetic * vol_cell;
           Eth_i += (u+delta_e) * vol_cell;
-          if ((zfb == mesh_size.x3min)||(zft == mesh_size.x3max)){
+          if ((zfb == zbottom)||(zft == ztop)){
             dM_i += m3 * area_cell;
             Px_i += m1 * m3/rho * area_cell;
             Py_i += m2 * m3/rho * area_cell;
