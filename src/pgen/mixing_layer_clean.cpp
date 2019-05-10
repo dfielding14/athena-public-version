@@ -60,6 +60,9 @@ static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
 static Real smoothing_thickness, velocity_pert, lambda_pert, z_top, z_bot;
 
+static int nstages;
+static Real weights[4];
+
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
 // Inputs:
@@ -104,6 +107,49 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
   Lambda_cool = pin->GetReal("problem", "Lambda_cool");
   s_Lambda = pin->GetReal("problem", "s_Lambda");
+
+  // Get the number of stages based on the integrator
+  
+  std::string integrator = pin->GetString("time", "integrator");
+
+  if ((integrator == 'rk2')||(integrator == 'vl2')){
+    nstages = 2;
+    if (integrator == 'rk2'){
+      weights[0]=0.5;
+      weights[1]=0.5;
+      weights[2]=0.0;
+      weights[3]=0.0;
+    } else {
+      weights[0]=0.0;
+      weights[1]=1.0;
+      weights[2]=0.0;
+      weights[3]=0.0;
+    }
+  }
+  if (integrator == 'rk3'){
+    nstages = 3;
+    weights[0]=1./6.;
+    weights[1]=1./6.;
+    weights[2]=2./3.;
+    weights[3]=0.0;
+  }
+  if (integrator == 'rk4'){
+    nstages = 4;
+    weights[0]=1./6.;
+    weights[1]=1./3.;
+    weights[2]=1./3.;
+    weights[3]=1./6.;
+  }
+
+  if(Globals::my_rank==0) {
+    std::cout << "nstages = " << nstages << "\n";
+    std::cout << "Tmin = " << Tmin << "\n";
+    std::cout << "Tmax = " << Tmax << "\n";
+    std::cout << "Tmix = " << Tmix << "\n";
+    std::cout << "Tlow = " << Tlow << "\n";
+    std::cout << "Thigh = " << Thigh << "\n";
+  }
+
 
   // Initial conditions and Boundary values
   smoothing_thickness = pin->GetReal("problem", "smoothing_thickness");
@@ -426,43 +472,45 @@ if (MAGNETIC_FIELDS_ENABLED) {
       }
     }
   }
-  pmb->ruser_meshblock_data[0](0) += e_cool;
-  pmb->ruser_meshblock_data[0](2) += M_h;
-  pmb->ruser_meshblock_data[0](3) += M_i;
-  pmb->ruser_meshblock_data[0](4) += M_c;
-  pmb->ruser_meshblock_data[0](5) += dM_h;
-  pmb->ruser_meshblock_data[0](6) += dM_i;
-  pmb->ruser_meshblock_data[0](7) += dM_c;
-  pmb->ruser_meshblock_data[0](8) += Px_h;
-  pmb->ruser_meshblock_data[0](9) += Px_i;
-  pmb->ruser_meshblock_data[0](10) += Px_c;
-  pmb->ruser_meshblock_data[0](11) += dPx_h;
-  pmb->ruser_meshblock_data[0](12) += dPx_i;
-  pmb->ruser_meshblock_data[0](13) += dPx_c;
-  pmb->ruser_meshblock_data[0](14) += Py_h;
-  pmb->ruser_meshblock_data[0](15) += Py_i;
-  pmb->ruser_meshblock_data[0](16) += Py_c;
-  pmb->ruser_meshblock_data[0](17) += dPy_h;
-  pmb->ruser_meshblock_data[0](18) += dPy_i;
-  pmb->ruser_meshblock_data[0](19) += dPy_c;
-  pmb->ruser_meshblock_data[0](20) += Pz_h;
-  pmb->ruser_meshblock_data[0](21) += Pz_i;
-  pmb->ruser_meshblock_data[0](22) += Pz_c;
-  pmb->ruser_meshblock_data[0](23) += dPz_h;
-  pmb->ruser_meshblock_data[0](24) += dPz_i;
-  pmb->ruser_meshblock_data[0](25) += dPz_c;
-  pmb->ruser_meshblock_data[0](26) += Ek_h;
-  pmb->ruser_meshblock_data[0](27) += Ek_i;
-  pmb->ruser_meshblock_data[0](28) += Ek_c;
-  pmb->ruser_meshblock_data[0](29) += dEk_h;
-  pmb->ruser_meshblock_data[0](30) += dEk_i;
-  pmb->ruser_meshblock_data[0](31) += dEk_c;
-  pmb->ruser_meshblock_data[0](32) += Eth_h;
-  pmb->ruser_meshblock_data[0](33) += Eth_i;
-  pmb->ruser_meshblock_data[0](34) += Eth_c;
-  pmb->ruser_meshblock_data[0](35) += dEth_h;
-  pmb->ruser_meshblock_data[0](36) += dEth_i;
-  pmb->ruser_meshblock_data[0](37) += dEth_c;
+  pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
+  if (stage == nstages){
+    pmb->ruser_meshblock_data[0](2) += M_h;
+    pmb->ruser_meshblock_data[0](3) += M_i;
+    pmb->ruser_meshblock_data[0](4) += M_c;
+    pmb->ruser_meshblock_data[0](5) += dM_h;
+    pmb->ruser_meshblock_data[0](6) += dM_i;
+    pmb->ruser_meshblock_data[0](7) += dM_c;
+    pmb->ruser_meshblock_data[0](8) += Px_h;
+    pmb->ruser_meshblock_data[0](9) += Px_i;
+    pmb->ruser_meshblock_data[0](10) += Px_c;
+    pmb->ruser_meshblock_data[0](11) += dPx_h;
+    pmb->ruser_meshblock_data[0](12) += dPx_i;
+    pmb->ruser_meshblock_data[0](13) += dPx_c;
+    pmb->ruser_meshblock_data[0](14) += Py_h;
+    pmb->ruser_meshblock_data[0](15) += Py_i;
+    pmb->ruser_meshblock_data[0](16) += Py_c;
+    pmb->ruser_meshblock_data[0](17) += dPy_h;
+    pmb->ruser_meshblock_data[0](18) += dPy_i;
+    pmb->ruser_meshblock_data[0](19) += dPy_c;
+    pmb->ruser_meshblock_data[0](20) += Pz_h;
+    pmb->ruser_meshblock_data[0](21) += Pz_i;
+    pmb->ruser_meshblock_data[0](22) += Pz_c;
+    pmb->ruser_meshblock_data[0](23) += dPz_h;
+    pmb->ruser_meshblock_data[0](24) += dPz_i;
+    pmb->ruser_meshblock_data[0](25) += dPz_c;
+    pmb->ruser_meshblock_data[0](26) += Ek_h;
+    pmb->ruser_meshblock_data[0](27) += Ek_i;
+    pmb->ruser_meshblock_data[0](28) += Ek_c;
+    pmb->ruser_meshblock_data[0](29) += dEk_h;
+    pmb->ruser_meshblock_data[0](30) += dEk_i;
+    pmb->ruser_meshblock_data[0](31) += dEk_c;
+    pmb->ruser_meshblock_data[0](32) += Eth_h;
+    pmb->ruser_meshblock_data[0](33) += Eth_i;
+    pmb->ruser_meshblock_data[0](34) += Eth_c;
+    pmb->ruser_meshblock_data[0](35) += dEth_h;
+    pmb->ruser_meshblock_data[0](36) += dEth_i;
+    pmb->ruser_meshblock_data[0](37) += dEth_c;
+  }
 
   return;
 }
