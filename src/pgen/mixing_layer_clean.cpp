@@ -321,6 +321,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     }
   }
 
+  if(Globals::my_rank==0) {
+    std::cout << "edot_cool(pgas_0*scale_temperature,rho_0) = " << edot_cool(pgas_0*scale_temperature,rho_0) << "\n";
+  }
+
+
   // initialize interface B, assuming vertical field only B=(0,0,1)
   if (MAGNETIC_FIELDS_ENABLED) {
     for (int k=ks; k<=ke+1; k++) {
