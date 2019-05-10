@@ -254,10 +254,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
-  // Allocate storage for keeping track of cooling
+  // Allocate storage for keeping track of cooling and fluxes
   AllocateRealUserMeshBlockDataField(1);
-  ruser_meshblock_data[0].NewAthenaArray(1);
-  ruser_meshblock_data[0](0) = 0.0;
+  ruser_meshblock_data[0].NewAthenaArray(38);
+  for (int i = 0; i < 38; ++i) {
+    ruser_meshblock_data[0](i) = 0.0;
+  }
+
   return;
 }
 
@@ -287,10 +290,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
   int B_direction = pin->GetOrAddInteger("problem", "B_direction", 0); // 0 = x, 1 = y, 2 = z
-
-  if(Globals::my_rank==0) {
-    std::cout << "bulk_velocity_z = " << bulk_velocity_z << "\n";
-  }
 
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
@@ -341,10 +340,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     AthenaArray<Real> b;
     peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   }
-
-  if(Globals::my_rank==0) {
-    std::cout << "done initializing "  << "\n";
-  } 
   return;
 }
 
