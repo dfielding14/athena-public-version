@@ -130,7 +130,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     nstages = 2;
     if (integrator_name.compare(rk2) == 0 ){
       weights[0]=0.5;
-      weights[1]=0.5;
+      weights[1]=1.0;
       weights[2]=0.0;
       weights[3]=0.0;
     } else {
@@ -143,16 +143,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if (integrator_name.compare(rk3) == 0 ){
     nstages = 3;
     weights[0]=1./6.;
-    weights[1]=1./6.;
-    weights[2]=2./3.;
+    weights[1]=2./3.;
+    weights[2]=1.0;
     weights[3]=0.0;
-  }
-  if (integrator_name.compare(rk4) == 0 ){
-    nstages = 4;
-    weights[0]=1./6.;
-    weights[1]=1./3.;
-    weights[2]=1./3.;
-    weights[3]=1./6.;
   }
 
   if(Globals::my_rank==0) {
@@ -320,11 +313,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       }
     }
   }
-
-  if(Globals::my_rank==0) {
-    std::cout << "edot_cool(pgas_0*scale_temperature,rho_0) = " << edot_cool(pgas_0*scale_temperature,rho_0) << "\n";
-  }
-
 
   // initialize interface B, assuming vertical field only B=(0,0,1)
   if (MAGNETIC_FIELDS_ENABLED) {
