@@ -260,7 +260,6 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
   for (int i = 0; i < 38; ++i) {
     ruser_meshblock_data[0](i) = 0.0;
   }
-
   return;
 }
 
@@ -488,6 +487,12 @@ if (MAGNETIC_FIELDS_ENABLED) {
       }
     }
   }
+
+
+  if(Globals::my_rank==0) {
+    std::cout << "stage = " << stage << "   e_cool = " << e_cool << "\n";
+  }
+
   pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
   if (stage == nstages){
     pmb->ruser_meshblock_data[0](2) += M_h;
