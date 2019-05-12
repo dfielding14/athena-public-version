@@ -99,6 +99,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   bulk_velocity_z        = pin->GetOrAddReal("problem", "bulk_velocity_z", 0.0); // for testing
   scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
 
+  // Read cooling-table-related parameters from input file
+  t_cool_start = pin->GetReal("problem", "t_cool_start");
+  dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
+  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
+  Lambda_cool = pin->GetReal("problem", "Lambda_cool");
+  s_Lambda = pin->GetReal("problem", "s_Lambda");
+
   Tmin = pgas_0/rho_0 / density_contrast;
   Tmax = pgas_0/rho_0;
   Tmix = sqrt(Tmin*Tmax);
@@ -106,12 +113,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Thigh = sqrt(Tmix*Tmax);
   M = std::log(Tmix) + SQR(s_Lambda);
 
-  // Read cooling-table-related parameters from input file
-  t_cool_start = pin->GetReal("problem", "t_cool_start");
-  dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
-  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
-  Lambda_cool = pin->GetReal("problem", "Lambda_cool");
-  s_Lambda = pin->GetReal("problem", "s_Lambda");
 
   //
   zbottom = mesh_size.x3min;
@@ -320,6 +321,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     }
   }
 
+  if(Globals::my_rank==0) {
+    std::cout << "edot_cool(pgas_0*scale_temperature,rho_0) = " << edot_cool(pgas_0*scale_temperature,rho_0) << "\n";
+  }
+
+
   // initialize interface B, assuming vertical field only B=(0,0,1)
   if (MAGNETIC_FIELDS_ENABLED) {
     for (int k=ks; k<=ke+1; k++) {
@@ -445,12 +451,13 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_h += kinetic * vol_cell;
           Eth_h += (u+delta_e) * vol_cell;
           if ((zfb == zbottom)||(zft == ztop)){
-            dM_h += m3 * area_cell;
-            Px_h += m1 * m3/rho * area_cell;
-            Py_h += m2 * m3/rho * area_cell;
-            Pz_h += m3 * m3/rho * area_cell;
-            Ek_h += kinetic * m3/rho *area_cell;
-            Eth_h += (u+delta_e) * m3/rho * area_cell;
+            Real sign = (zft == ztop)? -1.0 : 1.0;
+            dM_h += sign * m3 * area_cell;
+            Px_h += sign * m1 * m3/rho * area_cell;
+            Py_h += sign * m2 * m3/rho * area_cell;
+            Pz_h += sign * m3 * m3/rho * area_cell;
+            Ek_h += sign * kinetic * m3/rho *area_cell;
+            Eth_h += sign * (u+delta_e) * m3/rho * area_cell;
           }
         } else if (T<Tlow){
           M_c += rho * vol_cell;
@@ -460,12 +467,13 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_c += kinetic * vol_cell;
           Eth_c += (u+delta_e) * vol_cell;
           if ((zfb == zbottom)||(zft == ztop)){
-            dM_c += m3 * area_cell;
-            Px_c += m1 * m3/rho * area_cell;
-            Py_c += m2 * m3/rho * area_cell;
-            Pz_c += m3 * m3/rho * area_cell;
-            Ek_c += kinetic * m3/rho *area_cell;
-            Eth_c += (u+delta_e) * m3/rho * area_cell;
+            Real sign = (zft == ztop)? -1.0 : 1.0;
+            dM_c += sign * m3 * area_cell;
+            Px_c += sign * m1 * m3/rho * area_cell;
+            Py_c += sign * m2 * m3/rho * area_cell;
+            Pz_c += sign * m3 * m3/rho * area_cell;
+            Ek_c += sign * kinetic * m3/rho *area_cell;
+            Eth_c += sign * (u+delta_e) * m3/rho * area_cell;
           }
         } else {
           M_i += rho * vol_cell;
@@ -475,12 +483,13 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_i += kinetic * vol_cell;
           Eth_i += (u+delta_e) * vol_cell;
           if ((zfb == zbottom)||(zft == ztop)){
-            dM_i += m3 * area_cell;
-            Px_i += m1 * m3/rho * area_cell;
-            Py_i += m2 * m3/rho * area_cell;
-            Pz_i += m3 * m3/rho * area_cell;
-            Ek_i += kinetic * m3/rho *area_cell;
-            Eth_i += (u+delta_e) * m3/rho * area_cell;
+            Real sign = (zft == ztop)? -1.0 : 1.0;
+            dM_i += sign * m3 * area_cell;
+            Px_i += sign * m1 * m3/rho * area_cell;
+            Py_i += sign * m2 * m3/rho * area_cell;
+            Pz_i += sign * m3 * m3/rho * area_cell;
+            Ek_i += sign * kinetic * m3/rho *area_cell;
+            Eth_i += sign * (u+delta_e) * m3/rho * area_cell;
           }
         }
         e_cool += delta_e;
