@@ -485,11 +485,6 @@ if (MAGNETIC_FIELDS_ENABLED) {
     }
   }
 
-
-  if(Globals::my_rank==0) {
-    std::cout << "stage = " << stage << "   e_cool = " << e_cool << "\n";
-  }
-
   pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
   if (stage == nstages){
     pmb->ruser_meshblock_data[0](2) += M_h;
