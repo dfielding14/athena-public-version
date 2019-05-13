@@ -60,6 +60,7 @@ static Real rho_0, pgas_0;
 static Real density_contrast,velocity;
 static Real Lambda_cool, s_Lambda, t_cool_start;
 static Real Tmin,Tmax,Tmix,Tlow,Thigh,M;
+static Real T_cond_max;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
