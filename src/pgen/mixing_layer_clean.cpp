@@ -40,6 +40,11 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 
 // Boundary Conditions
 void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -228,6 +233,16 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
   if (DeviatoricSmagorinskyConduction_on){
     EnrollConductionCoefficient(DeviatoricSmagorinskyConduction);
+  }
+
+  bool SpitzerViscosity_on = pin->GetOrAddBoolean("problem", "SpitzerViscosity_on", false);
+  bool SpitzerConduction_on = pin->GetOrAddBoolean("problem", "SpitzerConduction_on", false);
+
+  if (SpitzerViscosity_on){
+    EnrollViscosityCoefficient(SpitzerViscosity);
+  }
+  if (SpitzerConduction_on){
+    EnrollConductionCoefficient(SpitzerConduction);
   }
 
   // Enroll no inflow boundary condition but only if it is turned on
@@ -836,6 +851,41 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
                              -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+
+// ----------------------------------------------------------------------------------------
+// SpitzerViscosity 
+// 
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso * std::max(1.0 , pow( T/T_cond_max ,2.5));
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// SpitzerConduction 
+// 
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * std::max(1.0 , pow( T/T_cond_max ,2.5));
       }
     }
   }
