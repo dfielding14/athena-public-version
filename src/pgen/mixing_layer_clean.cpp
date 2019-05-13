@@ -103,6 +103,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   velocity               = pin->GetReal("problem", "velocity");
   bulk_velocity_z        = pin->GetOrAddReal("problem", "bulk_velocity_z", 0.0); // for testing
   scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
+  T_cond_max             = pin->GetOrAddReal("problem", "T_cond_max", 1.0); // the value of P/rho where conduction saturates
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
