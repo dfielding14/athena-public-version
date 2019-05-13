@@ -870,7 +870,7 @@ void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<R
     for (int j=js; j<=je; ++j) {
       for (int i=is+1; i<=ie; ++i) {
         Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
-        phdif->nu(ISO,k,j,i) = phdif->nu_iso * std::max(1.0 , pow( T/T_cond_max ,2.5));
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
       }
     }
   }
@@ -887,7 +887,7 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
     for (int j=js; j<=je; ++j) {
       for (int i=is+1; i<=ie; ++i) {
         Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * std::max(1.0 , pow( T/T_cond_max ,2.5));
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
       }
     }
   }
