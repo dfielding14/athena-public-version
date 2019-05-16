@@ -40,6 +40,15 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
+void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void DeviatoricSmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 
 // Boundary Conditions
 void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -48,6 +57,17 @@ void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
 void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                     FaceField &b, Real time, Real dt,
                     int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+
 
 // Global variables
 static Real gamma_adi;
@@ -112,7 +132,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Tlow = sqrt(Tmin*Tmix);
   Thigh = sqrt(Tmix*Tmax);
   M = std::log(Tmix) + SQR(s_Lambda);
-
 
   //
   zbottom = mesh_size.x3min;
@@ -221,20 +240,40 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   bool SmagorinskyConduction_on = pin->GetOrAddBoolean("problem", "SmagorinskyConduction_on", false);
 
   if (SmagorinskyViscosity_on){
-    EnrollViscosityCoefficient(SmagorinskyViscosity);
+    if (mesh_size.nx2 == 1){
+      EnrollViscosityCoefficient(SmagorinskyViscosity1D);
+    } else {
+      EnrollViscosityCoefficient(SmagorinskyViscosity);
+    }
+    
   }
   if (SmagorinskyConduction_on){
-    EnrollConductionCoefficient(SmagorinskyConduction);
+    if (mesh_size.nx2 == 1){
+      EnrollConductionCoefficient(SmagorinskyConduction1D);
+    } else {
+      EnrollConductionCoefficient(SmagorinskyConduction);
+    }
+    
   }
 
   bool DeviatoricSmagorinskyViscosity_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyViscosity_on", false);
   bool DeviatoricSmagorinskyConduction_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyConduction_on", false);
 
   if (DeviatoricSmagorinskyViscosity_on){
-    EnrollViscosityCoefficient(DeviatoricSmagorinskyViscosity);
+    if (mesh_size.nx2 == 1){
+      EnrollViscosityCoefficient(DeviatoricSmagorinskyViscosity1D);
+    } else {
+      EnrollViscosityCoefficient(DeviatoricSmagorinskyViscosity);
+    }
+    
   }
   if (DeviatoricSmagorinskyConduction_on){
-    EnrollConductionCoefficient(DeviatoricSmagorinskyConduction);
+    if (mesh_size.nx2 == 1){
+      EnrollConductionCoefficient(DeviatoricSmagorinskyConduction1D);
+    } else {
+      EnrollConductionCoefficient(DeviatoricSmagorinskyConduction);
+    }
+    
   }
 
   // Enroll no inflow boundary condition but only if it is turned on
@@ -691,6 +730,266 @@ void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
 
 
 
+//----------------------------------------------------------------------------------------
+//! \fn void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones outer x1 boundary using second order derivative
+
+void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          Real fp = prim(n,k,j,ie) - prim(n,k,j,ie-1);
+          Real fpp = prim(n,k,j,ie) - 2*prim(n,k,j,ie-1) + prim(n,k,j,ie-2);
+          prim(n,k,j,ie+i) = prim(n,k,j,ie) + i*fp + 0.5*SQR(i)*fpp;  
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x1f(k,j,(ie+i+1)) = b.x1f(k,j,(ie+1));
+      }
+    }}
+
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x2f(k,j,(ie+i)) = b.x2f(k,j,ie);
+      }
+    }}
+
+    for (int k=ks; k<=ke+1; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x3f(k,j,(ie+i)) = b.x3f(k,j,ie);
+      }
+    }}
+  }
+  return;
+}
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones Inner x1 boundary using second order derivative
+
+void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          Real fp = prim(n,k,j,is) - prim(n,k,j,is+1);
+          Real fpp = prim(n,k,j,is) - 2*prim(n,k,j,is+1) + prim(n,k,j,is+2);
+          prim(n,k,j,is-i) = prim(n,k,j,is) + i*fp + 0.5*SQR(i)*fpp;  
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x1f(k,j,(is-i)) = b.x1f(k,j,is);
+      }
+    }}
+
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x2f(k,j,(is-i)) = b.x2f(k,j,is);
+      }
+    }}
+
+    for (int k=ks; k<=ke+1; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x3f(k,j,(is-i)) = b.x3f(k,j,is);
+      }
+    }}
+  }
+  return;
+}
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones outer x1 boundary using second order derivative
+
+void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
+          Real fp = prim(n,ke,j,i) - prim(n,ke-1,j,i);
+          Real fpp = prim(n,ke,j,i) - 2*prim(n,ke-1,j,i) + prim(n,ke-2,j,i);
+          prim(n,ke+k,j,i) = prim(n,ke,j,i) + i*fp + 0.5*SQR(i)*fpp;  
+        }
+      }
+    }
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ke+k  ),j,i) = b.x1f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ke+k  ),j,i) = b.x2f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ke+k+1),j,i) = b.x3f((ke+1),j,i);
+      }
+    }}
+  }  
+  return;
+}
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones Inner x1 boundary using second order derivative
+
+void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
+          Real fp = prim(n,ks,j,i) - prim(n,ks+1,j,i);
+          Real fpp = prim(n,ks,j,i) - 2*prim(n,ks+1,j,i) + prim(n,ks+2,j,i);
+          prim(n,ks-k,j,i) = prim(n,ks,j,i) + k*fp + 0.5*SQR(k)*fpp;  
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ks-k),j,i) = b.x1f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ks-k),j,i) = b.x2f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ks-k),j,i) = b.x3f(ks,j,i);
+      }
+    }}
+  }
+  return;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ----------------------------------------------------------------------------------------
 // SmagorinskyViscosity 
 // nu = (C * dx)^2 * |S|
@@ -853,3 +1152,139 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
   }
   return;
 }
+
+
+
+
+
+
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Viscosity 
+// nu = (C * dx)^2 * |S|
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1; //, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->nu(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
+
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Conduction 
+// kappa = (C * dx)^2 * |S| / Prandtl
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1;//, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->kappa(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
+
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+
+
+
+
+
+
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Viscosity 
+// nu = (C * dx)^2 * |S|
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void DeviatoricSmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1; //, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->nu(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
+
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Conduction 
+// kappa = (C * dx)^2 * |S| / Prandtl
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1;//, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->kappa(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
+
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm; 
+      }
+    }
+  }
+  return;
+}
+
+
+
