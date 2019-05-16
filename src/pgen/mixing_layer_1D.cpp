@@ -1029,7 +1029,7 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 
         S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
 
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm; 
       }
     }
   }

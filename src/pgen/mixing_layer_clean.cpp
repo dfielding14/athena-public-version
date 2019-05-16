@@ -40,7 +40,6 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
-<<<<<<< HEAD
 void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
@@ -48,11 +47,11 @@ void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaA
 void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void DeviatoricSmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
-=======
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
->>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
 
@@ -962,40 +961,6 @@ void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ----------------------------------------------------------------------------------------
 // SmagorinskyViscosity 
 // nu = (C * dx)^2 * |S|
@@ -1160,9 +1125,39 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 }
 
 
-<<<<<<< HEAD
+// ----------------------------------------------------------------------------------------
+// SpitzerViscosity 
+// 
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+      }
+    }
+  }
+  return;
+}
 
-
+// ----------------------------------------------------------------------------------------
+// SpitzerConduction 
+// 
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+      }
+    }
+  }
+  return;
+}
 
 
 
@@ -1190,27 +1185,12 @@ void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaA
         S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
 
         phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm;
-=======
-// ----------------------------------------------------------------------------------------
-// SpitzerViscosity 
-// 
-void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
-     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
-{
-  for (int k=ks; k<=ke; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is+1; i<=ie; ++i) {
-        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
-        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
->>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
       }
     }
   }
   return;
 }
-
 // ----------------------------------------------------------------------------------------
-<<<<<<< HEAD
 // Nonlinear Mixing Conduction 
 // kappa = (C * dx)^2 * |S| / Prandtl
 // S_ij = 0.5*(dvelj_dxi + dveli_dxj)
@@ -1234,29 +1214,11 @@ void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const Athena
         S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
-=======
-// SpitzerConduction 
-// 
-void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
-     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
-{
-  for (int k=ks; k<=ke; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is+1; i<=ie; ++i) {
-        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
->>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
       }
     }
   }
   return;
 }
-<<<<<<< HEAD
-
-
-
-
-
 
 
 
@@ -1319,8 +1281,3 @@ void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, co
   }
   return;
 }
-
-
-
-=======
->>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
