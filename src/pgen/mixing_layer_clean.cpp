@@ -40,6 +40,7 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
+<<<<<<< HEAD
 void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
@@ -47,6 +48,11 @@ void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaA
 void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void DeviatoricSmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+=======
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+>>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
 
@@ -75,6 +81,7 @@ static Real rho_0, pgas_0;
 static Real density_contrast,velocity;
 static Real Lambda_cool, s_Lambda, t_cool_start;
 static Real Tmin,Tmax,Tmix,Tlow,Thigh,M;
+static Real T_cond_max;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
@@ -118,6 +125,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   velocity               = pin->GetReal("problem", "velocity");
   bulk_velocity_z        = pin->GetOrAddReal("problem", "bulk_velocity_z", 0.0); // for testing
   scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
+  T_cond_max             = pin->GetOrAddReal("problem", "T_cond_max", 1.0); // the value of P/rho where conduction saturates
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
@@ -149,7 +157,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     nstages = 2;
     if (integrator_name.compare(rk2) == 0 ){
       weights[0]=0.5;
-      weights[1]=0.5;
+      weights[1]=1.0;
       weights[2]=0.0;
       weights[3]=0.0;
     } else {
@@ -162,16 +170,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if (integrator_name.compare(rk3) == 0 ){
     nstages = 3;
     weights[0]=1./6.;
-    weights[1]=1./6.;
-    weights[2]=2./3.;
+    weights[1]=2./3.;
+    weights[2]=1.0;
     weights[3]=0.0;
-  }
-  if (integrator_name.compare(rk4) == 0 ){
-    nstages = 4;
-    weights[0]=1./6.;
-    weights[1]=1./3.;
-    weights[2]=1./3.;
-    weights[3]=1./6.;
   }
 
   if(Globals::my_rank==0) {
@@ -276,6 +277,16 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     
   }
 
+  bool SpitzerViscosity_on = pin->GetOrAddBoolean("problem", "SpitzerViscosity_on", false);
+  bool SpitzerConduction_on = pin->GetOrAddBoolean("problem", "SpitzerConduction_on", false);
+
+  if (SpitzerViscosity_on){
+    EnrollViscosityCoefficient(SpitzerViscosity);
+  }
+  if (SpitzerConduction_on){
+    EnrollConductionCoefficient(SpitzerConduction);
+  }
+
   // Enroll no inflow boundary condition but only if it is turned on
   if(mesh_bcs[INNER_X3] == GetBoundaryFlag("user")) {
     EnrollUserBoundaryFunction(INNER_X3, ConstantShearInflowInnerX3);
@@ -300,7 +311,6 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
   for (int i = 0; i < 38; ++i) {
     ruser_meshblock_data[0](i) = 0.0;
   }
-
   return;
 }
 
@@ -360,11 +370,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       }
     }
   }
-
-  if(Globals::my_rank==0) {
-    std::cout << "edot_cool(pgas_0*scale_temperature,rho_0) = " << edot_cool(pgas_0*scale_temperature,rho_0) << "\n";
-  }
-
 
   // initialize interface B, assuming vertical field only B=(0,0,1)
   if (MAGNETIC_FIELDS_ENABLED) {
@@ -493,11 +498,11 @@ if (MAGNETIC_FIELDS_ENABLED) {
           if ((zfb == zbottom)||(zft == ztop)){
             Real sign = (zft == ztop)? -1.0 : 1.0;
             dM_h += sign * m3 * area_cell;
-            Px_h += sign * m1 * m3/rho * area_cell;
-            Py_h += sign * m2 * m3/rho * area_cell;
-            Pz_h += sign * m3 * m3/rho * area_cell;
-            Ek_h += sign * kinetic * m3/rho *area_cell;
-            Eth_h += sign * (u+delta_e) * m3/rho * area_cell;
+            dPx_h += sign * m1 * m3/rho * area_cell;
+            dPy_h += sign * m2 * m3/rho * area_cell;
+            dPz_h += sign * m3 * m3/rho * area_cell;
+            dEk_h += sign * kinetic * m3/rho *area_cell;
+            dEth_h += sign * (u+delta_e) * m3/rho * area_cell;
           }
         } else if (T<Tlow){
           M_c += rho * vol_cell;
@@ -509,11 +514,11 @@ if (MAGNETIC_FIELDS_ENABLED) {
           if ((zfb == zbottom)||(zft == ztop)){
             Real sign = (zft == ztop)? -1.0 : 1.0;
             dM_c += sign * m3 * area_cell;
-            Px_c += sign * m1 * m3/rho * area_cell;
-            Py_c += sign * m2 * m3/rho * area_cell;
-            Pz_c += sign * m3 * m3/rho * area_cell;
-            Ek_c += sign * kinetic * m3/rho *area_cell;
-            Eth_c += sign * (u+delta_e) * m3/rho * area_cell;
+            dPx_c += sign * m1 * m3/rho * area_cell;
+            dPy_c += sign * m2 * m3/rho * area_cell;
+            dPz_c += sign * m3 * m3/rho * area_cell;
+            dEk_c += sign * kinetic * m3/rho *area_cell;
+            dEth_c += sign * (u+delta_e) * m3/rho * area_cell;
           }
         } else {
           M_i += rho * vol_cell;
@@ -525,17 +530,18 @@ if (MAGNETIC_FIELDS_ENABLED) {
           if ((zfb == zbottom)||(zft == ztop)){
             Real sign = (zft == ztop)? -1.0 : 1.0;
             dM_i += sign * m3 * area_cell;
-            Px_i += sign * m1 * m3/rho * area_cell;
-            Py_i += sign * m2 * m3/rho * area_cell;
-            Pz_i += sign * m3 * m3/rho * area_cell;
-            Ek_i += sign * kinetic * m3/rho *area_cell;
-            Eth_i += sign * (u+delta_e) * m3/rho * area_cell;
+            dPx_i += sign * m1 * m3/rho * area_cell;
+            dPy_i += sign * m2 * m3/rho * area_cell;
+            dPz_i += sign * m3 * m3/rho * area_cell;
+            dEk_i += sign * kinetic * m3/rho *area_cell;
+            dEth_i += sign * (u+delta_e) * m3/rho * area_cell;
           }
         }
         e_cool += delta_e;
       }
     }
   }
+
   pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
   if (stage == nstages){
     pmb->ruser_meshblock_data[0](2) += M_h;
@@ -1154,6 +1160,7 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 }
 
 
+<<<<<<< HEAD
 
 
 
@@ -1183,6 +1190,19 @@ void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaA
         S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
 
         phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm;
+=======
+// ----------------------------------------------------------------------------------------
+// SpitzerViscosity 
+// 
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+>>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
       }
     }
   }
@@ -1190,6 +1210,7 @@ void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaA
 }
 
 // ----------------------------------------------------------------------------------------
+<<<<<<< HEAD
 // Nonlinear Mixing Conduction 
 // kappa = (C * dx)^2 * |S| / Prandtl
 // S_ij = 0.5*(dvelj_dxi + dveli_dxj)
@@ -1213,11 +1234,24 @@ void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const Athena
         S_norm = sqrt(2.0*( SQR(dvel1_dx1)+0.5*(SQR(dvel2_dx1)+SQR(dvel3_dx1))));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
+=======
+// SpitzerConduction 
+// 
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+>>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
       }
     }
   }
   return;
 }
+<<<<<<< HEAD
 
 
 
@@ -1288,3 +1322,5 @@ void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, co
 
 
 
+=======
+>>>>>>> 6506759296d0f75e8e423366899e87532a130a3b
