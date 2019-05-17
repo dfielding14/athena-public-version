@@ -35,12 +35,12 @@ public:
   void Perturb(Real dt);
   void PerturbDensity();
   int64_t GetKcomp(int idx, int disp, int Nx);
-  Real dedt;
+  Real dedt,tdrive;
   void Project(AthenaFFTComplex **fv, int solenoidal);
 private:
   int64_t rseed;
   int nlow,nhigh;
-  Real dtdrive,tdrive;
+  Real dtdrive;
   Real tcorr,z_turb;
   Real expo,dvol;
   Real dpert;

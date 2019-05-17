@@ -26,7 +26,7 @@
 // Declarations
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage);
-Real CoolingLosses(MeshBlock *pmb, int iout);
+Real history_recorder(MeshBlock *pmb, int iout);
 static Real edot_cool(Real press, Real dens);
 
 
@@ -40,15 +40,28 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
 void DeviatoricSmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 
 // Global variables
 static Real gamma_adi;
 static Real rho_0, pgas_0;
 static Real density_contrast;
 static Real Lambda_cool, s_Lambda, t_cool_start;
+static Real Tmin,Tmax,Tmix,Tlow,Thigh,M;
+static Real T_cond_max;
+static Real dtdrive;
+
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
-static bool adaptive_driving; 
+
+static int nstages;
+static Real weights[4];
+static Real scale_temperature;
+static Real ztop, zbottom;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -80,6 +93,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho_0                  = pin->GetReal("problem", "rho_0");
   pgas_0                 = pin->GetReal("problem", "pgas_0");
   density_contrast       = pin->GetReal("problem", "density_contrast");
+  scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
+  T_cond_max             = pin->GetOrAddReal("problem", "T_cond_max", 1.0); // the value of P/rho where conduction saturates
+  dtdrive                = pin->GetReal("problem", "dtdrive");
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
@@ -88,23 +104,82 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Lambda_cool = pin->GetReal("problem", "Lambda_cool");
   s_Lambda = pin->GetReal("problem", "s_Lambda");
 
+  Tmin = pgas_0/rho_0 / density_contrast;
+  Tmax = pgas_0/rho_0;
+  Tmix = sqrt(Tmin*Tmax);
+  Tlow = sqrt(Tmin*Tmix);
+  Thigh = sqrt(Tmix*Tmax);
+  M = std::log(Tmix) + SQR(s_Lambda);
 
-  // Allocate fixed cooling table
-  AllocateRealUserMeshDataField(1);
-  ruser_mesh_data[0].NewAthenaArray(3); // delta_e_tot, vol_tot, vol_cell
 
-  Real vol_tot = (mesh_size.x1max - mesh_size.x1min)
-               * (mesh_size.x2max - mesh_size.x2min) 
-               * (mesh_size.x3max - mesh_size.x3min);
-  Real vol_cell = vol_tot / mesh_size.nx1 / mesh_size.nx2 / mesh_size.nx3;
-  ruser_mesh_data[0](1) = vol_tot;
-  ruser_mesh_data[0](2) = vol_cell;
+  //
+  zbottom = mesh_size.x3min;
+  ztop = mesh_size.x3max;
+
+  // Get the number of stages based on the integrator
+  std::string integrator_name = pin->GetString("time", "integrator");
+
+  std::string vl2 ("vl2");
+  std::string rk2 ("rk2");
+  std::string rk3 ("rk3");
+  std::string rk4 ("rk4");
+ 
+  if ((integrator_name.compare(rk2) == 0 )||(integrator_name.compare(vl2) == 0 )){
+    nstages = 2;
+    if (integrator_name.compare(rk2) == 0 ){
+      weights[0]=0.5;
+      weights[1]=1.0;
+      weights[2]=0.0;
+      weights[3]=0.0;
+    } else {
+      weights[0]=0.0;
+      weights[1]=1.0;
+      weights[2]=0.0;
+      weights[3]=0.0;
+    }
+  }
+  if (integrator_name.compare(rk3) == 0 ){
+    nstages = 3;
+    weights[0]=1./6.;
+    weights[1]=2./3.;
+    weights[2]=1.0;
+    weights[3]=0.0;
+  }
+
+  if(Globals::my_rank==0) {
+    std::cout << "nstages = " << nstages << "\n";
+    std::cout << "Tmin = " << Tmin << "\n";
+    std::cout << "Tmax = " << Tmax << "\n";
+    std::cout << "Tmix = " << Tmix << "\n";
+    std::cout << "Tlow = " << Tlow << "\n";
+    std::cout << "Thigh = " << Thigh << "\n";
+  }
+
 
   // Enroll user-defined functions
   EnrollUserExplicitSourceFunction(Cooling_Source_Function);
-  AllocateUserHistoryOutput(2);
-  EnrollUserHistoryOutput(0, CoolingLosses, "e_cool");
-  EnrollUserHistoryOutput(1, CoolingLosses, "e_ceil");
+  AllocateUserHistoryOutput(20);
+  EnrollUserHistoryOutput(0, history_recorder, "e_cool");
+  EnrollUserHistoryOutput(1, history_recorder, "e_ceil");
+  EnrollUserHistoryOutput(2, history_recorder, "M_h");
+  EnrollUserHistoryOutput(3, history_recorder, "M_i");
+  EnrollUserHistoryOutput(4, history_recorder, "M_c");
+  EnrollUserHistoryOutput(5, history_recorder, "Px_h");
+  EnrollUserHistoryOutput(6, history_recorder, "Px_i");
+  EnrollUserHistoryOutput(7, history_recorder, "Px_c");
+  EnrollUserHistoryOutput(8, history_recorder, "Py_h");
+  EnrollUserHistoryOutput(9, history_recorder, "Py_i");
+  EnrollUserHistoryOutput(10, history_recorder, "Py_c");
+  EnrollUserHistoryOutput(11, history_recorder, "Pz_h");
+  EnrollUserHistoryOutput(12, history_recorder, "Pz_i");
+  EnrollUserHistoryOutput(13, history_recorder, "Pz_c");
+  EnrollUserHistoryOutput(14, history_recorder, "Ek_h");
+  EnrollUserHistoryOutput(15, history_recorder, "Ek_i");
+  EnrollUserHistoryOutput(16, history_recorder, "Ek_c");
+  EnrollUserHistoryOutput(17, history_recorder, "Eth_h");
+  EnrollUserHistoryOutput(18, history_recorder, "Eth_i");
+  EnrollUserHistoryOutput(19, history_recorder, "Eth_c");
+
   EnrollUserTimeStepFunction(cooling_timestep);
 
   // Enroll user-defined conduction and viscosity
@@ -128,13 +203,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     EnrollConductionCoefficient(DeviatoricSmagorinskyConduction);
   }
 
-  // Enroll no inflow boundary condition but only if it is turned on
-  if(mesh_bcs[INNER_X3] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(INNER_X3, ConstantShearInflowInnerX3);
+  bool SpitzerViscosity_on = pin->GetOrAddBoolean("problem", "SpitzerViscosity_on", false);
+  bool SpitzerConduction_on = pin->GetOrAddBoolean("problem", "SpitzerConduction_on", false);
+
+  if (SpitzerViscosity_on){
+    EnrollViscosityCoefficient(SpitzerViscosity);
   }
-  if(mesh_bcs[OUTER_X3] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
+  if (SpitzerConduction_on){
+    EnrollConductionCoefficient(SpitzerConduction);
   }
+
+  AllocateRealUserMeshDataField(1);
+  ruser_mesh_data[0].NewAthenaArray(1);
+
   return;
 }
 
@@ -146,10 +227,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
-  // Allocate storage for keeping track of cooling
+  // Allocate storage for keeping track of cooling and fluxes
   AllocateRealUserMeshBlockDataField(1);
-  ruser_meshblock_data[0].NewAthenaArray(1);
-  ruser_meshblock_data[0](0) = 0.0;
+  ruser_meshblock_data[0].NewAthenaArray(20);
+  for (int i = 0; i < 20; ++i) {
+    ruser_meshblock_data[0](i) = 0.0;
+  }
   return;
 }
 
@@ -182,30 +265,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
-    Real z = pcoord->x3v(k);
     for (int j = jl; j <= ju; ++j) {
-      Real y = pcoord->x2v(j);
       for (int i = il; i <= iu; ++i) {
-        Real x = pcoord->x1v(i);
-        if (block_size.nx3 > 1) {
-          phydro->w(IDN,k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
-          phydro->w(IPR,k,j,i) = pgas_0;
-          phydro->w(IVX,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
-          phydro->w(IVY,k,j,i) = 0.0;
-          phydro->w(IVZ,k,j,i) = velocity_pert * (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
-        } else if (block_size.nx2 > 1) {
-          phydro->w(IDN,k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ) );
-          phydro->w(IPR,k,j,i) = pgas_0;
-          phydro->w(IVX,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ));
-          phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
-          phydro->w(IVZ,k,j,i) = 0.0;
-        } else {
-          phydro->w(IDN,k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ) );
-          phydro->w(IPR,k,j,i) = pgas_0;
-          phydro->w(IVX,k,j,i) = 0.0; 
-          phydro->w(IVY,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
-          phydro->w(IVZ,k,j,i) = 0.0;
-        }
+        phydro->w(IDN,k,j,i) = rho_0;
+        phydro->w(IPR,k,j,i) = pgas_0;
+        phydro->w(IVX,k,j,i) = 0.0;
+        phydro->w(IVY,k,j,i) = 0.0;
+        phydro->w(IVZ,k,j,i) = 0.0;
       }
     }
   }
@@ -284,12 +350,20 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
   int ks = pmb->ks;
   int ke = pmb->ke;
 
-  // Apply all source terms
-  Real delta_e_block = 0.0;
+  // history file 
+  Real e_cool = 0.0;
+  Real M_h=0.0, M_i=0.0, M_c=0.0;
+  Real Px_h=0.0, Px_i=0.0, Px_c=0.0;
+  Real Py_h=0.0, Py_i=0.0, Py_c=0.0;
+  Real Pz_h=0.0, Pz_i=0.0, Pz_c=0.0;
+  Real Ek_h=0.0, Ek_i=0.0, Ek_c=0.0;
+  Real Eth_h=0.0, Eth_i=0.0, Eth_c=0.0;
+
+  // calculate average T
+  // Real m[3] = {0}, gm[3];
   for (int k = ks; k <= ke; ++k) {
     for (int j = js; j <= je; ++j) {
       for (int i = is; i <= ie; ++i) {
-
         // Extract primitive and conserved quantities
         const Real &rho_half = prim(IDN,k,j,i);
         const Real &pgas_half = prim(IPR,k,j,i);
@@ -314,13 +388,93 @@ if (MAGNETIC_FIELDS_ENABLED) {
         if (t > t_cool_start){
           e += delta_e;
         }
-        if (stage == 2) {
-          delta_e_block += delta_e;
+
+        // M_h M_i M_c Px_h Px_i Px_c Py_h Py_i Py_c Pz_h Pz_i Pz_c Ek_h Ek_i Ek_c Eth_h Eth_i Eth_c
+        // I am not exactly sure which variables at which point in the stage i should be using for the calculation of T
+        Real T = (2./3.) * (u+delta_e) / rho;
+        // m[0] += delta_e*weights[stage-1]
+        // if (stage == nstages){
+        //   m[1] += T;
+        //   m[2] += 1.0;
+        // }
+        Real area_cell = pmb->pcoord->dx1f(i)*pmb->pcoord->dx2f(j);
+        Real vol_cell = area_cell*pmb->pcoord->dx3f(k);
+        if (T > Thigh){
+          M_h += rho * vol_cell;
+          Px_h += m1 * vol_cell;
+          Py_h += m2 * vol_cell;
+          Pz_h += m3 * vol_cell;
+          Ek_h += kinetic * vol_cell;
+          Eth_h += (u+delta_e) * vol_cell;
+        } else if (T<Tlow){
+          M_c += rho * vol_cell;
+          Px_c += m1 * vol_cell;
+          Py_c += m2 * vol_cell;
+          Pz_c += m3 * vol_cell;
+          Ek_c += kinetic * vol_cell;
+          Eth_c += (u+delta_e) * vol_cell;
+        } else {
+          M_i += rho * vol_cell;
+          Px_i += m1 * vol_cell;
+          Py_i += m2 * vol_cell;
+          Pz_i += m3 * vol_cell;
+          Ek_i += kinetic * vol_cell;
+          Eth_i += (u+delta_e) * vol_cell;
         }
+        e_cool += delta_e;
       }
     }
   }
-  pmb->ruser_meshblock_data[0](0) += delta_e_block;
+
+  pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
+  if (stage == nstages){
+    pmb->ruser_meshblock_data[0](2) += M_h;
+    pmb->ruser_meshblock_data[0](3) += M_i;
+    pmb->ruser_meshblock_data[0](4) += M_c;
+    pmb->ruser_meshblock_data[0](5) += Px_h;
+    pmb->ruser_meshblock_data[0](6) += Px_i;
+    pmb->ruser_meshblock_data[0](7) += Px_c;
+    pmb->ruser_meshblock_data[0](8) += Py_h;
+    pmb->ruser_meshblock_data[0](9) += Py_i;
+    pmb->ruser_meshblock_data[0](10) += Py_c;
+    pmb->ruser_meshblock_data[0](11) += Pz_h;
+    pmb->ruser_meshblock_data[0](12) += Pz_i;
+    pmb->ruser_meshblock_data[0](13) += Pz_c;
+    pmb->ruser_meshblock_data[0](14) += Ek_h;
+    pmb->ruser_meshblock_data[0](15) += Ek_i;
+    pmb->ruser_meshblock_data[0](16) += Ek_c;
+    pmb->ruser_meshblock_data[0](17) += Eth_h;
+    pmb->ruser_meshblock_data[0](18) += Eth_i;
+    pmb->ruser_meshblock_data[0](19) += Eth_c;
+  }
+
+  // If there is adaptive driving I need to add up and store the total amount
+  // of energy that has been cooled away. If the driving is continuous then
+  // there is no need to store since dedt can be set to match it exactly, but 
+  // if there is impulsive turbulence driving then I need to save up all the E
+  // to do this I am going to use ruser_mesh_data
+  // I wonder if I even need to do an MPI call. 
+  Real my_edotcool = 0., edotcool_tot;
+  my_edotcool += e_cool/dt*weights[stage-1];
+#ifdef MPI_PARALLEL
+    MPI_Allreduce(my_edotcool, edotcool_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+#else
+    edotcool_tot = my_edotcool;
+#endif
+  if(Globals::my_rank==0) {
+    std::cout << "edotcool_tot = " << edotcool_tot << "dt = " << dt << "\n";
+  }
+  ruser_mesh_data[0](0) += edotcool_tot*dt;
+  Real &dedt = pmb->pmy_mesh->ptrbd->dedt;
+  if ((stage == nstages)&&(adaptive_driving)){
+    if ((pmb->pmy_mesh->turb_flag == 3)&&(t > t_cool_start)){
+      dedt = edotcool_tot ; 
+    } else if ((pmb->pmy_mesh->turb_flag == 2)&&(t > t_cool_start)&&(t >= pmb->pmy_mesh->ptrbd->tdrive)){
+      dedt = ruser_mesh_data[0](0)/dtdrive;
+      ruser_mesh_data[0](0) = 0.0; // is this going to mess things up for other processors or blocks??
+    } 
+  }
+
   return;
 }
 
@@ -337,7 +491,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
 //     0: physical radiative losses
 //     1: numerical temperature ceiling
 
-Real CoolingLosses(MeshBlock *pmb, int iout)
+Real history_recorder(MeshBlock *pmb, int iout)
 {
   Real delta_e = pmb->ruser_meshblock_data[0](iout);
   pmb->ruser_meshblock_data[0](iout) = 0.0;
@@ -350,15 +504,13 @@ Real CoolingLosses(MeshBlock *pmb, int iout)
 
 static Real edot_cool(Real press, Real dens)
 {
-  Real Tmin = pgas_0/rho_0 / density_contrast;
-  Real Tmax = pgas_0/rho_0;
-  Real Tmix = sqrt(Tmin*Tmax);
   Real T = press/dens;
-  Real M = std::log(Tmix) + SQR(s_Lambda);
   Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
   Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
-  return Lambda_cool * SQR(dens) * (log_normal-log_normal_min);
+  return Lambda_cool * SQR(dens) * std::max(log_normal-log_normal_min,0.0);
 }
+
+
 
 
 
@@ -519,6 +671,41 @@ void DeviatoricSmagorinskyConduction(HydroDiffusion *phdif, MeshBlock *pmb, cons
                              -dvel2_dx2*dvel3_dx3 - dvel1_dx1*dvel2_dx2 - dvel1_dx1*dvel3_dx3)));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm;
+      }
+    }
+  }
+  return;
+}
+
+
+// ----------------------------------------------------------------------------------------
+// SpitzerViscosity 
+// 
+void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// SpitzerConduction 
+// 
+void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
       }
     }
   }
