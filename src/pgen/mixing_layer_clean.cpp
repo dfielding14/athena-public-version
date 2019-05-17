@@ -315,10 +315,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
 
   if(mesh_bcs[INNER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1);
+    EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1_on);
   }
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1);
+    EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1_on);
   }
   return;
 }
@@ -777,23 +777,24 @@ void ConstantShearExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
   // copy hydro variables into ghost zones
   for (int n=0; n<(NHYDRO); ++n) {
     for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
-        Real z = pco->x3v(ks-k);
-        Real fp = prim(n,k,j,ie) - prim(n,k,j,ie-1);
-        Real fpp = prim(n,k,j,ie) - 2*prim(n,k,j,ie-1) + prim(n,k,j,ie-2);
-        prim(n,k,j,ie+i) = prim(n,k,j,ie) + i*fp + 0.5*SQR(i)*fpp;  
-        if ( n == IPR ){
-          prim(IPR,ks-k,j,i) = pgas_0;
-        } 
-        if ( n == IDN ){
-          prim(IDN,ks-k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
-        } 
-        if ( n == IVX ){
-          prim(IVX,ks-k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
-        } 
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
+          Real z = pco->x3v(ks-k);
+          Real fp = prim(n,ks,j,i) - prim(n,ks+1,j,i);
+          Real fpp = prim(n,ks,j,i) - 2*prim(n,ks+1,j,i) + prim(n,ks+2,j,i);
+          prim(n,ks-k,j,i) = prim(n,ks,j,i) + k*fp + 0.5*SQR(k)*fpp;  
+          if ( n == IPR ){
+            prim(IPR,ks-k,j,i) = pgas_0;
+          } 
+          if ( n == IDN ){
+            prim(IDN,ks-k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+          } 
+          if ( n == IVX ){
+            prim(IVX,ks-k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
+          } 
+        }
       }
-    }}
+    }
   }
 
   // copy face-centered magnetic fields into ghost zones
@@ -835,23 +836,24 @@ void ConstantShearExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
   // copy hydro variables into ghost zones
   for (int n=0; n<(NHYDRO); ++n) {
     for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
-        Real z = pco->x3v(ke+k);
-        Real fp = prim(n,k,j,ie) - prim(n,k,j,ie-1);
-        Real fpp = prim(n,k,j,ie) - 2*prim(n,k,j,ie-1) + prim(n,k,j,ie-2);
-        prim(n,k,j,ie+i) = prim(n,k,j,ie) + i*fp + 0.5*SQR(i)*fpp;  
-        if ( n == IPR ){
-          prim(IPR,ke+k,j,i) = pgas_0;
-        } 
-        if ( n == IDN ){
-          prim(IDN,ke+k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
-        } 
-        if ( n == IVX ){
-          prim(IVX,ke+k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
-        } 
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
+          Real z = pco->x3v(ke+k);
+          Real fp = prim(n,ke,j,i) - prim(n,ke-1,j,i);
+          Real fpp = prim(n,ke,j,i) - 2*prim(n,ke-1,j,i) + prim(n,ke-2,j,i);
+          prim(n,ke+k,j,i) = prim(n,ke,j,i) + k*fp + 0.5*SQR(k)*fpp;  
+          if ( n == IPR ){
+            prim(IPR,ke+k,j,i) = pgas_0;
+          } 
+          if ( n == IDN ){
+            prim(IDN,ke+k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+          } 
+          if ( n == IVX ){
+            prim(IVX,ke+k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
+          } 
+        }
       }
-    }}
+    }
   }
 
   // copy face-centered magnetic fields into ghost zones
@@ -883,10 +885,112 @@ void ConstantShearExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
 
 
 
+//----------------------------------------------------------------------------------------
+//! \fn void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones Inner x1 boundary using second order derivative
+
+void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
+          Real fp = prim(n,ks,j,i) - prim(n,ks+1,j,i);
+          Real fpp = prim(n,ks,j,i) - 2*prim(n,ks+1,j,i) + prim(n,ks+2,j,i);
+          prim(n,ks-k,j,i) = prim(n,ks,j,i) + k*fp + 0.5*SQR(k)*fpp;  
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ks-k),j,i) = b.x1f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ks-k),j,i) = b.x2f(ks,j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ks-k),j,i) = b.x3f(ks,j,i);
+      }
+    }}
+  }
+  return;
+}
 
 
 
 
+//----------------------------------------------------------------------------------------
+//! \fn void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones outer x1 boundary using second order derivative
+
+void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=1; k<=ngh; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=is; i<=ie; ++i) {
+          Real fp = prim(n,ke,j,i) - prim(n,ke-1,j,i);
+          Real fpp = prim(n,ke,j,i) - 2*prim(n,ke-1,j,i) + prim(n,ke-2,j,i);
+          prim(n,ke+k,j,i) = prim(n,ke,j,i) + k*fp + 0.5*SQR(k)*fpp;  
+        }
+      }
+    }
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f((ke+k  ),j,i) = b.x1f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x2f((ke+k  ),j,i) = b.x2f((ke  ),j,i);
+      }
+    }}
+
+    for (int k=1; k<=ngh; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x3f((ke+k+1),j,i) = b.x3f((ke+1),j,i);
+      }
+    }}
+  }  
+  return;
+}
+
+
+//----------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------
 
 
 
@@ -1001,118 +1105,6 @@ void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   }
   return;
 }
-
-
-
-
-
-
-
-
-//----------------------------------------------------------------------------------------
-//! \fn void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-//                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
-//
-//  \brief extrapolate into ghost zones outer x1 boundary using second order derivative
-
-void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
-{
-  // extrapolate hydro variables into ghost zones
-  for (int n=0; n<(NHYDRO); ++n) {
-    for (int k=1; k<=ngh; ++k) {
-      for (int j=js; j<=je; ++j) {
-        for (int i=is; i<=ie; ++i) {
-          Real fp = prim(n,ke,j,i) - prim(n,ke-1,j,i);
-          Real fpp = prim(n,ke,j,i) - 2*prim(n,ke-1,j,i) + prim(n,ke-2,j,i);
-          prim(n,ke+k,j,i) = prim(n,ke,j,i) + i*fp + 0.5*SQR(i)*fpp;  
-        }
-      }
-    }
-  }
-
-  // copy face-centered magnetic fields into ghost zones
-  if (MAGNETIC_FIELDS_ENABLED) {
-    for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie+1; ++i) {
-        b.x1f((ke+k  ),j,i) = b.x1f((ke  ),j,i);
-      }
-    }}
-
-    for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
-        b.x2f((ke+k  ),j,i) = b.x2f((ke  ),j,i);
-      }
-    }}
-
-    for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
-        b.x3f((ke+k+1),j,i) = b.x3f((ke+1),j,i);
-      }
-    }}
-  }  
-  return;
-}
-
-
-
-
-//----------------------------------------------------------------------------------------
-//! \fn void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-//                          FaceField &b, Real time, Real dt,
-//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
-//
-//  \brief extrapolate into ghost zones Inner x1 boundary using second order derivative
-
-void ExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
-     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
-{
-  // extrapolate hydro variables into ghost zones
-  for (int n=0; n<(NHYDRO); ++n) {
-    for (int k=1; k<=ngh; ++k) {
-      for (int j=js; j<=je; ++j) {
-        for (int i=is; i<=ie; ++i) {
-          Real fp = prim(n,ks,j,i) - prim(n,ks+1,j,i);
-          Real fpp = prim(n,ks,j,i) - 2*prim(n,ks+1,j,i) + prim(n,ks+2,j,i);
-          prim(n,ks-k,j,i) = prim(n,ks,j,i) + k*fp + 0.5*SQR(k)*fpp;  
-        }
-      }
-    }
-  }
-  // copy face-centered magnetic fields into ghost zones
-  if (MAGNETIC_FIELDS_ENABLED) {
-    for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie+1; ++i) {
-        b.x1f((ks-k),j,i) = b.x1f(ks,j,i);
-      }
-    }}
-
-    for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je+1; ++j) {
-      for (int i=is; i<=ie; ++i) {
-        b.x2f((ks-k),j,i) = b.x2f(ks,j,i);
-      }
-    }}
-
-    for (int k=1; k<=ngh; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=is; i<=ie; ++i) {
-        b.x3f((ks-k),j,i) = b.x3f(ks,j,i);
-      }
-    }}
-  }
-  return;
-}
-
-
-
-
-
 
 
 
