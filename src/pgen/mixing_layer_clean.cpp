@@ -198,7 +198,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   z_bot               = pin->GetReal("problem", "z_bot");
 
   // Enroll user-defined functions
-  EnrollUserExplicitSourceFunction(Cooling_Source_Function);
+  // EnrollUserExplicitSourceFunction(Cooling_Source_Function);
   AllocateUserHistoryOutput(38);
   EnrollUserHistoryOutput(0, history_recorder, "e_cool");
   EnrollUserHistoryOutput(1, history_recorder, "e_ceil");
