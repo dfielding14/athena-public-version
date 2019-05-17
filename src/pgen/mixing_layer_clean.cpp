@@ -315,10 +315,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
 
   if(mesh_bcs[INNER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1_on);
+    EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1);
   }
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1_on);
+    EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1);
   }
   return;
 }
