@@ -293,14 +293,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
 
 
-  bool ConstantShearInflowOuterX3_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowOuterX3_on", false)
-  bool ConstantShearInflowInnerX3_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowInnerX3_on", false)
-  bool ConstantShearExtrapOuterX3_on = pin->GetOrAddBoolean("problem", "ConstantShearExtrapOuterX3_on", false)
-  bool ConstantShearExtrapInnerX3_on = pin->GetOrAddBoolean("problem", "ConstantShearExtrapInnerX3_on", false)
-  bool ExtrapInnerX1_on = pin->GetOrAddBoolean("problem", "ExtrapInnerX1_on", false)
-  bool ExtrapOuterX1_on = pin->GetOrAddBoolean("problem", "ExtrapOuterX1_on", false)
-  bool ExtrapInnerX3_on = pin->GetOrAddBoolean("problem", "ExtrapInnerX3_on", false)
-  bool ExtrapOuterX3_on = pin->GetOrAddBoolean("problem", "ExtrapOuterX3_on", false)
+  bool ConstantShearInflowOuterX3_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowOuterX3_on", false);
+  bool ConstantShearInflowInnerX3_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowInnerX3_on", false);
+  bool ConstantShearExtrapOuterX3_on = pin->GetOrAddBoolean("problem", "ConstantShearExtrapOuterX3_on", false);
+  bool ConstantShearExtrapInnerX3_on = pin->GetOrAddBoolean("problem", "ConstantShearExtrapInnerX3_on", false);
+  bool ExtrapInnerX1_on = pin->GetOrAddBoolean("problem", "ExtrapInnerX1_on", false);
+  bool ExtrapOuterX1_on = pin->GetOrAddBoolean("problem", "ExtrapOuterX1_on", false);
+  bool ExtrapInnerX3_on = pin->GetOrAddBoolean("problem", "ExtrapInnerX3_on", false);
+  bool ExtrapOuterX3_on = pin->GetOrAddBoolean("problem", "ExtrapOuterX3_on", false);
 
   // Enroll boundary condition
   if(mesh_bcs[INNER_X3] == GetBoundaryFlag("user")) {
