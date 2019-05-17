@@ -320,6 +320,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
     EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1);
   }
+
+  if(Globals::my_rank==0) {
+    std::cout << "done with InitUserMeshData" << "\n";
+  }
   return;
 }
 
@@ -362,6 +366,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   if (block_size.nx3 > 1) {
     kl -= (NGHOST);
     ku += (NGHOST);
+  }
+
+  if(Globals::my_rank==0) {
+    std::cout << "starting ProblemGenerator" << "\n";
   }
 
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
@@ -416,6 +424,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     AthenaArray<Real> b;
     peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   }
+
+  if(Globals::my_rank==0) {
+    std::cout << "done with ProblemGenerator" << "\n";
+  }
+
   return;
 }
 
