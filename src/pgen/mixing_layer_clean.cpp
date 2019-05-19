@@ -17,7 +17,7 @@
 #include "../eos/eos.hpp"                  // EquationOfState
 #include "../field/field.hpp"              // Field
 #include "../hydro/hydro.hpp"              // Hydro
-#include "../fft/turbulence.hpp"           // Turbulence
+//#include "../fft/turbulence.hpp"           // Turbulence
 #include "../hydro/hydro_diffusion/hydro_diffusion.hpp" // diffusion
 
 // External library headers
@@ -495,6 +495,11 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
         Real &m1 = cons(IM1,k,j,i);
         Real &m2 = cons(IM2,k,j,i);
         Real &m3 = cons(IM3,k,j,i);
+
+        if(Globals::my_rank==0) {
+          std::cout << "in source term, pgas_half = " << pgas_half << "\n";
+        }
+
 
         // Apply cooling and heating
         Real delta_e = -edot_cool(pgas_half, rho_half) * dt;
