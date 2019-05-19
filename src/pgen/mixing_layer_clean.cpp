@@ -17,7 +17,7 @@
 #include "../eos/eos.hpp"                  // EquationOfState
 #include "../field/field.hpp"              // Field
 #include "../hydro/hydro.hpp"              // Hydro
-//#include "../fft/turbulence.hpp"           // Turbulence
+#include "../fft/turbulence.hpp"           // Turbulence
 #include "../hydro/hydro_diffusion/hydro_diffusion.hpp" // diffusion
 
 // External library headers
@@ -466,155 +466,153 @@ Real cooling_timestep(MeshBlock *pmb)
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
 {
-  // Extract indices
-  int is = pmb->is;
-  int ie = pmb->ie;
-  int js = pmb->js;
-  int je = pmb->je;
-  int ks = pmb->ks;
-  int ke = pmb->ke;
-
-  // Apply all source terms
-  Real e_cool = 0.0;
-  Real M_h=0.0, M_i=0.0, M_c=0.0, dM_h=0.0, dM_i=0.0, dM_c=0.0;
-  Real Px_h=0.0, Px_i=0.0, Px_c=0.0, dPx_h=0.0, dPx_i=0.0, dPx_c=0.0;
-  Real Py_h=0.0, Py_i=0.0, Py_c=0.0, dPy_h=0.0, dPy_i=0.0, dPy_c=0.0;
-  Real Pz_h=0.0, Pz_i=0.0, Pz_c=0.0, dPz_h=0.0, dPz_i=0.0, dPz_c=0.0;
-  Real Ek_h=0.0, Ek_i=0.0, Ek_c=0.0, dEk_h=0.0, dEk_i=0.0, dEk_c=0.0;
-  Real Eth_h=0.0, Eth_i=0.0, Eth_c=0.0, dEth_h=0.0, dEth_i=0.0, dEth_c=0.0;
-  for (int k = ks; k <= ke; ++k) {
-    Real zfb = pmb->pcoord->x3f(k);
-    Real zft = pmb->pcoord->x3f(k+1);
-    for (int j = js; j <= je; ++j) {
-      for (int i = is; i <= ie; ++i) {
-        // Extract primitive and conserved quantities
-        const Real &rho_half = prim(IDN,k,j,i);
-        const Real &pgas_half = prim(IPR,k,j,i);
-        const Real &rho = cons(IDN,k,j,i);
-        Real &e = cons(IEN,k,j,i);
-        Real &m1 = cons(IM1,k,j,i);
-        Real &m2 = cons(IM2,k,j,i);
-        Real &m3 = cons(IM3,k,j,i);
-
-        if(Globals::my_rank==0) {
-          std::cout << "in source term, pgas_half = " << pgas_half << "\n";
-        }
-
-
-        // Apply cooling and heating
-        Real delta_e = -edot_cool(pgas_half, rho_half) * dt;
-        Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
-        Real u = e - kinetic;
-if (MAGNETIC_FIELDS_ENABLED) {  
-          const Real &bcc1 = bcc(IB1,k,j,i);
-          const Real &bcc2 = bcc(IB2,k,j,i);
-          const Real &bcc3 = bcc(IB3,k,j,i);
-          Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
-          u -= magnetic; 
-        }
-        delta_e = std::max(delta_e, -u);
-        if (t > t_cool_start){
-          e += delta_e;
-        }
-
-        // // M_h M_i M_c dM_h dM_i dM_c Px_h Px_i Px_c dPx_h dPx_i dPx_c Py_h Py_i Py_c dPy_h dPy_i dPy_c Pz_h Pz_i Pz_c dPz_h dPz_i dPz_c Ek_h Ek_i Ek_c dEk_h dEk_i dEk_c Eth_h Eth_i Eth_c dEth_h dEth_i dEth_c
-        // // I am not exactly sure which variables at which point in the stage i should be using for the calculation of T
-        // Real T = (2./3.) * (u+delta_e) / rho;
-        // Real area_cell = pmb->pcoord->dx1f(i)*pmb->pcoord->dx2f(j);
-        // Real vol_cell = area_cell*pmb->pcoord->dx3f(k);
-        // if (T > Thigh){
-        //   M_h += rho * vol_cell;
-        //   Px_h += m1 * vol_cell;
-        //   Py_h += m2 * vol_cell;
-        //   Pz_h += m3 * vol_cell;
-        //   Ek_h += kinetic * vol_cell;
-        //   Eth_h += (u+delta_e) * vol_cell;
-        //   if ((zfb == zbottom)||(zft == ztop)){
-        //     Real sign = (zft == ztop)? -1.0 : 1.0;
-        //     dM_h += sign * m3 * area_cell;
-        //     dPx_h += sign * m1 * m3/rho * area_cell;
-        //     dPy_h += sign * m2 * m3/rho * area_cell;
-        //     dPz_h += sign * m3 * m3/rho * area_cell;
-        //     dEk_h += sign * kinetic * m3/rho *area_cell;
-        //     dEth_h += sign * (u+delta_e) * m3/rho * area_cell;
-        //   }
-        // } else if (T<Tlow){
-        //   M_c += rho * vol_cell;
-        //   Px_c += m1 * vol_cell;
-        //   Py_c += m2 * vol_cell;
-        //   Pz_c += m3 * vol_cell;
-        //   Ek_c += kinetic * vol_cell;
-        //   Eth_c += (u+delta_e) * vol_cell;
-        //   if ((zfb == zbottom)||(zft == ztop)){
-        //     Real sign = (zft == ztop)? -1.0 : 1.0;
-        //     dM_c += sign * m3 * area_cell;
-        //     dPx_c += sign * m1 * m3/rho * area_cell;
-        //     dPy_c += sign * m2 * m3/rho * area_cell;
-        //     dPz_c += sign * m3 * m3/rho * area_cell;
-        //     dEk_c += sign * kinetic * m3/rho *area_cell;
-        //     dEth_c += sign * (u+delta_e) * m3/rho * area_cell;
-        //   }
-        // } else {
-        //   M_i += rho * vol_cell;
-        //   Px_i += m1 * vol_cell;
-        //   Py_i += m2 * vol_cell;
-        //   Pz_i += m3 * vol_cell;
-        //   Ek_i += kinetic * vol_cell;
-        //   Eth_i += (u+delta_e) * vol_cell;
-        //   if ((zfb == zbottom)||(zft == ztop)){
-        //     Real sign = (zft == ztop)? -1.0 : 1.0;
-        //     dM_i += sign * m3 * area_cell;
-        //     dPx_i += sign * m1 * m3/rho * area_cell;
-        //     dPy_i += sign * m2 * m3/rho * area_cell;
-        //     dPz_i += sign * m3 * m3/rho * area_cell;
-        //     dEk_i += sign * kinetic * m3/rho *area_cell;
-        //     dEth_i += sign * (u+delta_e) * m3/rho * area_cell;
-        //   }
-        // }
-        e_cool += delta_e;
-      }
-    }
+  if(Globals::my_rank==0) {
+    std::cout << "in source function " << "\n";
   }
+  // Extract indices
+//   int is = pmb->is;
+//   int ie = pmb->ie;
+//   int js = pmb->js;
+//   int je = pmb->je;
+//   int ks = pmb->ks;
+//   int ke = pmb->ke;
 
-  // pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
-  // if (stage == nstages){
-  //   pmb->ruser_meshblock_data[0](2) += M_h;
-  //   pmb->ruser_meshblock_data[0](3) += M_i;
-  //   pmb->ruser_meshblock_data[0](4) += M_c;
-  //   pmb->ruser_meshblock_data[0](5) += dM_h;
-  //   pmb->ruser_meshblock_data[0](6) += dM_i;
-  //   pmb->ruser_meshblock_data[0](7) += dM_c;
-  //   pmb->ruser_meshblock_data[0](8) += Px_h;
-  //   pmb->ruser_meshblock_data[0](9) += Px_i;
-  //   pmb->ruser_meshblock_data[0](10) += Px_c;
-  //   pmb->ruser_meshblock_data[0](11) += dPx_h;
-  //   pmb->ruser_meshblock_data[0](12) += dPx_i;
-  //   pmb->ruser_meshblock_data[0](13) += dPx_c;
-  //   pmb->ruser_meshblock_data[0](14) += Py_h;
-  //   pmb->ruser_meshblock_data[0](15) += Py_i;
-  //   pmb->ruser_meshblock_data[0](16) += Py_c;
-  //   pmb->ruser_meshblock_data[0](17) += dPy_h;
-  //   pmb->ruser_meshblock_data[0](18) += dPy_i;
-  //   pmb->ruser_meshblock_data[0](19) += dPy_c;
-  //   pmb->ruser_meshblock_data[0](20) += Pz_h;
-  //   pmb->ruser_meshblock_data[0](21) += Pz_i;
-  //   pmb->ruser_meshblock_data[0](22) += Pz_c;
-  //   pmb->ruser_meshblock_data[0](23) += dPz_h;
-  //   pmb->ruser_meshblock_data[0](24) += dPz_i;
-  //   pmb->ruser_meshblock_data[0](25) += dPz_c;
-  //   pmb->ruser_meshblock_data[0](26) += Ek_h;
-  //   pmb->ruser_meshblock_data[0](27) += Ek_i;
-  //   pmb->ruser_meshblock_data[0](28) += Ek_c;
-  //   pmb->ruser_meshblock_data[0](29) += dEk_h;
-  //   pmb->ruser_meshblock_data[0](30) += dEk_i;
-  //   pmb->ruser_meshblock_data[0](31) += dEk_c;
-  //   pmb->ruser_meshblock_data[0](32) += Eth_h;
-  //   pmb->ruser_meshblock_data[0](33) += Eth_i;
-  //   pmb->ruser_meshblock_data[0](34) += Eth_c;
-  //   pmb->ruser_meshblock_data[0](35) += dEth_h;
-  //   pmb->ruser_meshblock_data[0](36) += dEth_i;
-  //   pmb->ruser_meshblock_data[0](37) += dEth_c;
-  // }
+//   // Apply all source terms
+//   Real e_cool = 0.0;
+//   Real M_h=0.0, M_i=0.0, M_c=0.0, dM_h=0.0, dM_i=0.0, dM_c=0.0;
+//   Real Px_h=0.0, Px_i=0.0, Px_c=0.0, dPx_h=0.0, dPx_i=0.0, dPx_c=0.0;
+//   Real Py_h=0.0, Py_i=0.0, Py_c=0.0, dPy_h=0.0, dPy_i=0.0, dPy_c=0.0;
+//   Real Pz_h=0.0, Pz_i=0.0, Pz_c=0.0, dPz_h=0.0, dPz_i=0.0, dPz_c=0.0;
+//   Real Ek_h=0.0, Ek_i=0.0, Ek_c=0.0, dEk_h=0.0, dEk_i=0.0, dEk_c=0.0;
+//   Real Eth_h=0.0, Eth_i=0.0, Eth_c=0.0, dEth_h=0.0, dEth_i=0.0, dEth_c=0.0;
+//   for (int k = ks; k <= ke; ++k) {
+//     Real zfb = pmb->pcoord->x3f(k);
+//     Real zft = pmb->pcoord->x3f(k+1);
+//     for (int j = js; j <= je; ++j) {
+//       for (int i = is; i <= ie; ++i) {
+//         // Extract primitive and conserved quantities
+//         const Real &rho_half = prim(IDN,k,j,i);
+//         const Real &pgas_half = prim(IPR,k,j,i);
+//         const Real &rho = cons(IDN,k,j,i);
+//         Real &e = cons(IEN,k,j,i);
+//         Real &m1 = cons(IM1,k,j,i);
+//         Real &m2 = cons(IM2,k,j,i);
+//         Real &m3 = cons(IM3,k,j,i);
+
+//         // Apply cooling and heating
+//         Real delta_e = -edot_cool(pgas_half, rho_half) * dt;
+//         Real kinetic = (SQR(m1) + SQR(m2) + SQR(m3)) / (2.0 * rho);
+//         Real u = e - kinetic;
+// if (MAGNETIC_FIELDS_ENABLED) {  
+//           const Real &bcc1 = bcc(IB1,k,j,i);
+//           const Real &bcc2 = bcc(IB2,k,j,i);
+//           const Real &bcc3 = bcc(IB3,k,j,i);
+//           Real magnetic = 0.5*(SQR(bcc1) + SQR(bcc2) + SQR(bcc3));
+//           u -= magnetic; 
+//         }
+//         delta_e = std::max(delta_e, -u);
+//         if (t > t_cool_start){
+//           e += delta_e;
+//         }
+
+//         // M_h M_i M_c dM_h dM_i dM_c Px_h Px_i Px_c dPx_h dPx_i dPx_c Py_h Py_i Py_c dPy_h dPy_i dPy_c Pz_h Pz_i Pz_c dPz_h dPz_i dPz_c Ek_h Ek_i Ek_c dEk_h dEk_i dEk_c Eth_h Eth_i Eth_c dEth_h dEth_i dEth_c
+//         // I am not exactly sure which variables at which point in the stage i should be using for the calculation of T
+//         Real T = (2./3.) * (u+delta_e) / rho;
+//         Real area_cell = pmb->pcoord->dx1f(i)*pmb->pcoord->dx2f(j);
+//         Real vol_cell = area_cell*pmb->pcoord->dx3f(k);
+//         if (T > Thigh){
+//           M_h += rho * vol_cell;
+//           Px_h += m1 * vol_cell;
+//           Py_h += m2 * vol_cell;
+//           Pz_h += m3 * vol_cell;
+//           Ek_h += kinetic * vol_cell;
+//           Eth_h += (u+delta_e) * vol_cell;
+//           if ((zfb == zbottom)||(zft == ztop)){
+//             Real sign = (zft == ztop)? -1.0 : 1.0;
+//             dM_h += sign * m3 * area_cell;
+//             dPx_h += sign * m1 * m3/rho * area_cell;
+//             dPy_h += sign * m2 * m3/rho * area_cell;
+//             dPz_h += sign * m3 * m3/rho * area_cell;
+//             dEk_h += sign * kinetic * m3/rho *area_cell;
+//             dEth_h += sign * (u+delta_e) * m3/rho * area_cell;
+//           }
+//         } else if (T<Tlow){
+//           M_c += rho * vol_cell;
+//           Px_c += m1 * vol_cell;
+//           Py_c += m2 * vol_cell;
+//           Pz_c += m3 * vol_cell;
+//           Ek_c += kinetic * vol_cell;
+//           Eth_c += (u+delta_e) * vol_cell;
+//           if ((zfb == zbottom)||(zft == ztop)){
+//             Real sign = (zft == ztop)? -1.0 : 1.0;
+//             dM_c += sign * m3 * area_cell;
+//             dPx_c += sign * m1 * m3/rho * area_cell;
+//             dPy_c += sign * m2 * m3/rho * area_cell;
+//             dPz_c += sign * m3 * m3/rho * area_cell;
+//             dEk_c += sign * kinetic * m3/rho *area_cell;
+//             dEth_c += sign * (u+delta_e) * m3/rho * area_cell;
+//           }
+//         } else {
+//           M_i += rho * vol_cell;
+//           Px_i += m1 * vol_cell;
+//           Py_i += m2 * vol_cell;
+//           Pz_i += m3 * vol_cell;
+//           Ek_i += kinetic * vol_cell;
+//           Eth_i += (u+delta_e) * vol_cell;
+//           if ((zfb == zbottom)||(zft == ztop)){
+//             Real sign = (zft == ztop)? -1.0 : 1.0;
+//             dM_i += sign * m3 * area_cell;
+//             dPx_i += sign * m1 * m3/rho * area_cell;
+//             dPy_i += sign * m2 * m3/rho * area_cell;
+//             dPz_i += sign * m3 * m3/rho * area_cell;
+//             dEk_i += sign * kinetic * m3/rho *area_cell;
+//             dEth_i += sign * (u+delta_e) * m3/rho * area_cell;
+//           }
+//         }
+//         e_cool += delta_e;
+//       }
+//     }
+//   }
+
+//   pmb->ruser_meshblock_data[0](0) += e_cool*weights[stage-1];
+//   if (stage == nstages){
+//     pmb->ruser_meshblock_data[0](2) += M_h;
+//     pmb->ruser_meshblock_data[0](3) += M_i;
+//     pmb->ruser_meshblock_data[0](4) += M_c;
+//     pmb->ruser_meshblock_data[0](5) += dM_h;
+//     pmb->ruser_meshblock_data[0](6) += dM_i;
+//     pmb->ruser_meshblock_data[0](7) += dM_c;
+//     pmb->ruser_meshblock_data[0](8) += Px_h;
+//     pmb->ruser_meshblock_data[0](9) += Px_i;
+//     pmb->ruser_meshblock_data[0](10) += Px_c;
+//     pmb->ruser_meshblock_data[0](11) += dPx_h;
+//     pmb->ruser_meshblock_data[0](12) += dPx_i;
+//     pmb->ruser_meshblock_data[0](13) += dPx_c;
+//     pmb->ruser_meshblock_data[0](14) += Py_h;
+//     pmb->ruser_meshblock_data[0](15) += Py_i;
+//     pmb->ruser_meshblock_data[0](16) += Py_c;
+//     pmb->ruser_meshblock_data[0](17) += dPy_h;
+//     pmb->ruser_meshblock_data[0](18) += dPy_i;
+//     pmb->ruser_meshblock_data[0](19) += dPy_c;
+//     pmb->ruser_meshblock_data[0](20) += Pz_h;
+//     pmb->ruser_meshblock_data[0](21) += Pz_i;
+//     pmb->ruser_meshblock_data[0](22) += Pz_c;
+//     pmb->ruser_meshblock_data[0](23) += dPz_h;
+//     pmb->ruser_meshblock_data[0](24) += dPz_i;
+//     pmb->ruser_meshblock_data[0](25) += dPz_c;
+//     pmb->ruser_meshblock_data[0](26) += Ek_h;
+//     pmb->ruser_meshblock_data[0](27) += Ek_i;
+//     pmb->ruser_meshblock_data[0](28) += Ek_c;
+//     pmb->ruser_meshblock_data[0](29) += dEk_h;
+//     pmb->ruser_meshblock_data[0](30) += dEk_i;
+//     pmb->ruser_meshblock_data[0](31) += dEk_c;
+//     pmb->ruser_meshblock_data[0](32) += Eth_h;
+//     pmb->ruser_meshblock_data[0](33) += Eth_i;
+//     pmb->ruser_meshblock_data[0](34) += Eth_c;
+//     pmb->ruser_meshblock_data[0](35) += dEth_h;
+//     pmb->ruser_meshblock_data[0](36) += dEth_i;
+//     pmb->ruser_meshblock_data[0](37) += dEth_c;
+//   }
 
   return;
 }
