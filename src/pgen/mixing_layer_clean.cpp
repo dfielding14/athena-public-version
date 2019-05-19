@@ -198,7 +198,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   z_bot               = pin->GetReal("problem", "z_bot");
 
   // Enroll user-defined functions
-  // EnrollUserExplicitSourceFunction(Cooling_Source_Function);
+  EnrollUserExplicitSourceFunction(Cooling_Source_Function);
   AllocateUserHistoryOutput(38);
   EnrollUserHistoryOutput(0, history_recorder, "e_cool");
   EnrollUserHistoryOutput(1, history_recorder, "e_ceil");
@@ -321,9 +321,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1);
   }
 
-  if(Globals::my_rank==0) {
-    std::cout << "done with InitUserMeshData" << "\n";
-  }
   return;
 }
 
@@ -366,10 +363,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   if (block_size.nx3 > 1) {
     kl -= (NGHOST);
     ku += (NGHOST);
-  }
-
-  if(Globals::my_rank==0) {
-    std::cout << "starting ProblemGenerator" << "\n";
   }
 
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
@@ -425,9 +418,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   }
 
-  if(Globals::my_rank==0) {
-    std::cout << "done with ProblemGenerator" << "\n";
-  }
 
   return;
 }
