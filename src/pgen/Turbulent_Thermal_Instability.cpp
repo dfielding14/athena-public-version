@@ -63,6 +63,8 @@ static Real weights[4];
 static Real scale_temperature;
 static Real ztop, zbottom;
 
+static bool adaptive_driving;
+
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
 // Inputs:
@@ -96,6 +98,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
   T_cond_max             = pin->GetOrAddReal("problem", "T_cond_max", 1.0); // the value of P/rho where conduction saturates
   dtdrive                = pin->GetReal("problem", "dtdrive");
+  adaptive_driving = pin->GetBoolean("problem", "adaptive_driving");
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
@@ -215,6 +218,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   AllocateRealUserMeshDataField(1);
   ruser_mesh_data[0].NewAthenaArray(1);
+  ruser_mesh_data[0](0) = 0.0;
 
   return;
 }
@@ -454,7 +458,8 @@ if (MAGNETIC_FIELDS_ENABLED) {
   // if there is impulsive turbulence driving then I need to save up all the E
   // to do this I am going to use ruser_mesh_data
   // I wonder if I even need to do an MPI call. 
-  Real my_edotcool = 0., edotcool_tot;
+  Real my_edotcool = 0.;
+  Real edotcool_tot;
   my_edotcool += e_cool/dt*weights[stage-1];
 #ifdef MPI_PARALLEL
     MPI_Allreduce(my_edotcool, edotcool_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
