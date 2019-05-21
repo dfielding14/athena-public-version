@@ -415,7 +415,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
           Ek_i += kinetic * vol_cell;
           Eth_i += (u+delta_e) * vol_cell;
         }
-        e_cool += delta_e;
+        e_cool += delta_e*vol_cell;
       }
     }
   }
@@ -450,7 +450,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
   // I wonder if I even need to do an MPI call. 
   Real my_edotcool[1] = {0}, edotcool_tot[1];
 
-  my_edotcool[0] += -e_cool/dt*weights[stage-1]*vol_cell;
+  my_edotcool[0] += -e_cool/dt*weights[stage-1];
 #ifdef MPI_PARALLEL
     MPI_Allreduce(my_edotcool, edotcool_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
