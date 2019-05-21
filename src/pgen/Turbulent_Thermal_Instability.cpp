@@ -512,8 +512,6 @@ static Real edot_cool(Real press, Real dens)
 
 
 
-
-
 // ----------------------------------------------------------------------------------------
 // SmagorinskyViscosity 
 // nu = (C * dx)^2 * |S|
