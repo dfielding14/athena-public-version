@@ -450,22 +450,22 @@ if (MAGNETIC_FIELDS_ENABLED) {
   // I wonder if I even need to do an MPI call. 
   Real my_edotcool[1] = {0}, edotcool_tot[1];
 
-  my_edotcool[0] += -e_cool/dt*weights[stage-1];
+  my_edotcool[0] += -e_cool/dt*weights[stage-1]*vol_cell;
 #ifdef MPI_PARALLEL
     MPI_Allreduce(my_edotcool, edotcool_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
     edotcool_tot[0] = my_edotcool[0];
 #endif
   if(Globals::my_rank==0) {
-    std::cout << "edotcool_tot = " << edotcool_tot[0] << "dt = " << dt << "\n";
+    std::cout << "edotcool_tot = " << edotcool_tot[0] << " dt = " << dt << "\n";
   }
   pmb->pmy_mesh->ruser_mesh_data[0](0) += edotcool_tot[0]*dt;
   Real &dedt = pmb->pmy_mesh->ptrbd->dedt;
   if ((stage == nstages)&&(adaptive_driving)){
     if ((pmb->pmy_mesh->turb_flag == 3)&&(t > t_cool_start)){
-      dedt = edotcool_tot[0] ; 
+      dedt = edotcool_tot[0] < 0 ? 0.0 : edotcool_tot[0] ; 
     } else if ((pmb->pmy_mesh->turb_flag == 2)&&(t > t_cool_start)&&(t >= pmb->pmy_mesh->ptrbd->tdrive)){
-      dedt = pmb->pmy_mesh->ruser_mesh_data[0](0)/dtdrive;
+      dedt = pmb->pmy_mesh->ruser_mesh_data[0](0)/dtdrive < 0 ? 0.0:pmb->pmy_mesh->ruser_mesh_data[0](0)/dtdrive;
       pmb->pmy_mesh->ruser_mesh_data[0](0) = 0.0; // is this going to mess things up for other processors or blocks??
     } 
   }
