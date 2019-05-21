@@ -219,7 +219,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   AllocateRealUserMeshDataField(1);
   ruser_mesh_data[0].NewAthenaArray(1);
   ruser_mesh_data[0](0) = 0.0;
-
   return;
 }
 
@@ -458,25 +457,25 @@ if (MAGNETIC_FIELDS_ENABLED) {
   // if there is impulsive turbulence driving then I need to save up all the E
   // to do this I am going to use ruser_mesh_data
   // I wonder if I even need to do an MPI call. 
-  Real my_edotcool = 0.;
-  Real edotcool_tot;
-  my_edotcool += e_cool/dt*weights[stage-1];
+  Real my_edotcool[1] = {0}, edotcool_tot[1];
+
+  my_edotcool[0] += e_cool/dt*weights[stage-1];
 #ifdef MPI_PARALLEL
     MPI_Allreduce(my_edotcool, edotcool_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
-    edotcool_tot = my_edotcool;
+    edotcool_tot[0] = my_edotcool[0];
 #endif
   if(Globals::my_rank==0) {
-    std::cout << "edotcool_tot = " << edotcool_tot << "dt = " << dt << "\n";
+    std::cout << "edotcool_tot = " << edotcool_tot[0] << "dt = " << dt << "\n";
   }
-  ruser_mesh_data[0](0) += edotcool_tot*dt;
+  pmb->pmy_mesh->ruser_mesh_data[0](0) += edotcool_tot[0]*dt;
   Real &dedt = pmb->pmy_mesh->ptrbd->dedt;
   if ((stage == nstages)&&(adaptive_driving)){
     if ((pmb->pmy_mesh->turb_flag == 3)&&(t > t_cool_start)){
-      dedt = edotcool_tot ; 
+      dedt = edotcool_tot[0] ; 
     } else if ((pmb->pmy_mesh->turb_flag == 2)&&(t > t_cool_start)&&(t >= pmb->pmy_mesh->ptrbd->tdrive)){
-      dedt = ruser_mesh_data[0](0)/dtdrive;
-      ruser_mesh_data[0](0) = 0.0; // is this going to mess things up for other processors or blocks??
+      dedt = pmb->pmy_mesh->ruser_mesh_data[0](0)/dtdrive;
+      pmb->pmy_mesh->ruser_mesh_data[0](0) = 0.0; // is this going to mess things up for other processors or blocks??
     } 
   }
 
