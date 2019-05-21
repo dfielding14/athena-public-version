@@ -60,9 +60,6 @@ static Real dt_cutoff, cfl_cool;
 
 static int nstages;
 static Real weights[4];
-static Real scale_temperature;
-static Real ztop, zbottom;
-
 static bool adaptive_driving;
 
 //----------------------------------------------------------------------------------------
@@ -95,10 +92,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rho_0                  = pin->GetReal("problem", "rho_0");
   pgas_0                 = pin->GetReal("problem", "pgas_0");
   density_contrast       = pin->GetReal("problem", "density_contrast");
-  scale_temperature      = pin->GetOrAddReal("problem", "scale_temperature", 1.0); // for testing
   T_cond_max             = pin->GetOrAddReal("problem", "T_cond_max", 1.0); // the value of P/rho where conduction saturates
   dtdrive                = pin->GetReal("problem", "dtdrive");
-  adaptive_driving = pin->GetBoolean("problem", "adaptive_driving");
+  adaptive_driving       = pin->GetBoolean("problem", "adaptive_driving");
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
@@ -113,11 +109,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Tlow = sqrt(Tmin*Tmix);
   Thigh = sqrt(Tmix*Tmax);
   M = std::log(Tmix) + SQR(s_Lambda);
-
-
-  //
-  zbottom = mesh_size.x3min;
-  ztop = mesh_size.x3max;
 
   // Get the number of stages based on the integrator
   std::string integrator_name = pin->GetString("time", "integrator");
@@ -459,7 +450,7 @@ if (MAGNETIC_FIELDS_ENABLED) {
   // I wonder if I even need to do an MPI call. 
   Real my_edotcool[1] = {0}, edotcool_tot[1];
 
-  my_edotcool[0] += e_cool/dt*weights[stage-1];
+  my_edotcool[0] += -e_cool/dt*weights[stage-1];
 #ifdef MPI_PARALLEL
     MPI_Allreduce(my_edotcool, edotcool_tot, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #else
