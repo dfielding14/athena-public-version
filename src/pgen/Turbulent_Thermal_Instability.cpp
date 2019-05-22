@@ -87,7 +87,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real length_scale      = pin->GetReal("problem", "length_scale");
   Real rho_scale         = pin->GetReal("problem", "rho_scale");
   Real pgas_scale        = pin->GetReal("problem", "pgas_scale");
-  Real temperature_scale = pin->GetReal("problem", "temperature_scale");
   Real vel_scale         = std::sqrt(pgas_scale / rho_scale);
   rho_0                  = pin->GetReal("problem", "rho_0");
   pgas_0                 = pin->GetReal("problem", "pgas_0");
@@ -256,13 +255,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
   int B_direction = pin->GetOrAddInteger("problem", "B_direction", 0); // 0 = x, 1 = y, 2 = z
+  Real temperature_scale = pin->GetReal("problem", "temperature_scale");
 
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
     for (int j = jl; j <= ju; ++j) {
       for (int i = il; i <= iu; ++i) {
         phydro->w(IDN,k,j,i) = rho_0;
-        phydro->w(IPR,k,j,i) = pgas_0/density_contrast;
+        phydro->w(IPR,k,j,i) = temperature_scale*pgas_0;
         phydro->w(IVX,k,j,i) = 0.0;
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = 0.0;
@@ -496,13 +496,26 @@ Real history_recorder(MeshBlock *pmb, int iout)
 
 //----------------------------------------------------------------------------------------
 // calculated edot_cool 
+// static Real edot_cool(Real press, Real dens)
+// {
+//   Real T = press/dens;
+//   Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
+//   Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
+//   return Lambda_cool * SQR(dens) * std::max(log_normal-log_normal_min,0.0);
+// }
 
+//----------------------------------------------------------------------------------------
+// calculated edot_cool 
 static Real edot_cool(Real press, Real dens)
 {
   Real T = press/dens;
-  Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
-  Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
-  return Lambda_cool * SQR(dens) * std::max(log_normal-log_normal_min,0.0);
+  if (T>1.0){
+    return SQR(dens)*(sqrt(T)-1.0);
+  } else {
+    Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
+    Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
+    return Lambda_cool * SQR(dens) * (log_normal-log_normal_min)
+  }
 }
 
 
@@ -523,7 +536,6 @@ void SmagorinskyViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArr
     for (int j=js; j<=je; ++j) {
       phdif->nu(ISO,k,j,is) = 0.0;
       for (int i=is+1; i<=ie; ++i) {
-
         dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
         dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
         dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
