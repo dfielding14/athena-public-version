@@ -512,9 +512,9 @@ static Real edot_cool(Real press, Real dens)
   if (T>1.0){
     return SQR(dens)*(sqrt(T)-1.0);
   } else {
-    Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
-    Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
-    return Lambda_cool * SQR(dens) * (log_normal-log_normal_min)
+    Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)); 
+    Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI));
+    return Lambda_cool * SQR(dens) * (log_normal-log_normal_min);
   }
 }
 
