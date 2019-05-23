@@ -50,7 +50,7 @@ void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<R
 static Real gamma_adi;
 static Real rho_0, pgas_0;
 static Real density_contrast;
-static Real Lambda_cool, s_Lambda, t_cool_start;
+static Real Lambda_cool, s_Lambda, t_cool_start, Lambda_hot;
 static Real Tmin,Tmax,Tmix,Tlow,Thigh,M;
 static Real T_cond_max;
 static Real dtdrive;
@@ -100,6 +100,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
   Lambda_cool = pin->GetReal("problem", "Lambda_cool");
+  Lambda_hot = pin->GetOrAddReal("problem", "Lambda_hot",1.0);
   s_Lambda = pin->GetReal("problem", "s_Lambda");
 
   Tmin = pgas_0/rho_0 / density_contrast;
@@ -510,7 +511,7 @@ static Real edot_cool(Real press, Real dens)
 {
   Real T = press/dens;
   if (T>1.0){
-    return SQR(dens)*(sqrt(T)-1.0);
+    return Lambda_hot *SQR(dens)*(sqrt(T)-1.0);
   } else {
     Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)); 
     Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI));
