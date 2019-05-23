@@ -457,9 +457,9 @@ if (MAGNETIC_FIELDS_ENABLED) {
 #else
     edotcool_tot[0] = my_edotcool[0];
 #endif
-  if(Globals::my_rank==0) {
-    std::cout << "edotcool_tot = " << edotcool_tot[0] << " dt = " << dt << "\n";
-  }
+  // if(Globals::my_rank==0) {
+  //   std::cout << "edotcool_tot = " << edotcool_tot[0] << " dt = " << dt << "\n";
+  // }
   pmb->pmy_mesh->ruser_mesh_data[0](0) += edotcool_tot[0]*dt;
   Real &dedt = pmb->pmy_mesh->ptrbd->dedt;
   if ((stage == nstages)&&(adaptive_driving)){
