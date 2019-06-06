@@ -504,12 +504,12 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     Real zfb = pmb->pcoord->x3f(k);
     Real zft = pmb->pcoord->x3f(k+1);
     for (int j = js; j <= je; ++j) {
-      if (pmb->pmy_mesh->block_size.nx3 == 1){
+      if (pmb->block_size.nx3 == 1){
         Real zfb = pmb->pcoord->x2f(j);
         Real zft = pmb->pcoord->x2f(j+1);
       }
       for (int i = is; i <= ie; ++i) {
-        if (pmb->pmy_mesh->block_size.nx2 == 1){
+        if (pmb->block_size.nx2 == 1){
           Real zfb = pmb->pcoord->x1f(i);
           Real zft = pmb->pcoord->x1f(i+1);
         }
