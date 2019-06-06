@@ -69,6 +69,13 @@ void ConstantShearExtrapInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
                     FaceField &b, Real time, Real dt,
                     int is, int ie, int js, int je, int ks, int ke, int ngh);
 
+void ConstantShearInflowOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantShearInflowInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -293,6 +300,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
 
 
+  bool ConstantShearInflowOuterX2_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowOuterX2_on", false);
+  bool ConstantShearInflowInnerX2_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowInnerX2_on", false);
+
   bool ConstantShearInflowOuterX3_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowOuterX3_on", false);
   bool ConstantShearInflowInnerX3_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowInnerX3_on", false);
   bool ConstantShearExtrapOuterX3_on = pin->GetOrAddBoolean("problem", "ConstantShearExtrapOuterX3_on", false);
@@ -312,6 +322,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     if (ConstantShearInflowOuterX3_on) EnrollUserBoundaryFunction(OUTER_X3, ConstantShearInflowOuterX3);
     if (ConstantShearExtrapOuterX3_on) EnrollUserBoundaryFunction(OUTER_X3, ConstantShearExtrapOuterX3);
     if (ExtrapOuterX3_on) EnrollUserBoundaryFunction(OUTER_X3, ExtrapOuterX3);
+  }
+
+  // Enroll boundary condition
+  if(mesh_bcs[INNER_X2] == GetBoundaryFlag("user")) {
+    if (ConstantShearInflowInnerX2_on) EnrollUserBoundaryFunction(INNER_X2, ConstantShearInflowInnerX2);
+  }
+  if(mesh_bcs[OUTER_X2] == GetBoundaryFlag("user")) {
+    if (ConstantShearInflowOuterX2_on) EnrollUserBoundaryFunction(OUTER_X2, ConstantShearInflowOuterX2);
   }
 
   if(mesh_bcs[INNER_X1] == GetBoundaryFlag("user")) {
@@ -486,7 +504,16 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     Real zfb = pmb->pcoord->x3f(k);
     Real zft = pmb->pcoord->x3f(k+1);
     for (int j = js; j <= je; ++j) {
+      if (pmb->pmy_mesh->block_size.nx3 == 1){
+        Real zfb = pmb->pcoord->x2f(j);
+        Real zft = pmb->pcoord->x2f(j+1);
+      }
       for (int i = is; i <= ie; ++i) {
+        if (pmb->pmy_mesh->block_size.nx2 == 1){
+          Real zfb = pmb->pcoord->x1f(i);
+          Real zft = pmb->pcoord->x1f(i+1);
+        }
+
         // Extract primitive and conserved quantities
         const Real &rho_half = prim(IDN,k,j,i);
         const Real &pgas_half = prim(IPR,k,j,i);
@@ -1001,6 +1028,121 @@ void ExtrapOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 
 
 
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearInflowInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief ConstantShearInflow boundary conditions, inner x2 boundary
+
+void ConstantShearInflowInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh) {
+  // copy hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        Real z = pco->x2v(ks-k);
+        prim(n,k,js-j,i) = prim(n,k,js,i);
+        if ( n == IPR ){
+          prim(IPR,k,js-j,i) = pgas_0;
+        } 
+        if ( n == IDN ){
+          prim(IDN,k,js-j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+        } 
+        if ( n == IVX ){
+          prim(IVX,k,js-j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
+        } 
+      }
+    }}
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f(k,(js-j),i) = b.x1f(k,js,i);
+      }
+    }}
+
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x2f(k,(js-j),i) = b.x2f(k,js,i);
+      }
+    }}
+
+    for (int k=ks; k<=ke+1; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x3f(k,(js-j),i) = b.x3f(k,js,i);
+      }
+    }}
+  }
+
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearInflowOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief ConstantShearInflow boundary conditions, outer x2 boundary
+
+void ConstantShearInflowOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh) {
+  // copy hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        Real z = pco->x2v(k);
+        prim(n,k,je+j,i) = prim(n,k,je,i);
+        if ( n == IPR ){
+          prim(IPR,k,je+j,i) = pgas_0;
+        } 
+        if ( n == IDN ){
+          prim(IDN,k,je+j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+        } 
+        if ( n == IVX ){
+          prim(IVX,k,je+j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
+        } 
+      }
+    }}
+  }
+
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie+1; ++i) {
+        b.x1f(k,(je+j  ),i) = b.x1f(k,(je  ),i);
+      }
+    }}
+
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x2f(k,(je+j+1),i) = b.x2f(k,(je+1),i);
+      }
+    }}
+
+    for (int k=ks; k<=ke+1; ++k) {
+    for (int j=1; j<=ngh; ++j) {
+      for (int i=is; i<=ie; ++i) {
+        b.x3f(k,(je+j  ),i) = b.x3f(k,(je  ),i);
+      }
+    }}
+  }
+
+
+  return;
+}
+
+
 
 
 
@@ -1292,7 +1434,8 @@ void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<R
     for (int j=js; j<=je; ++j) {
       for (int i=is+1; i<=ie; ++i) {
         Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
-        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+        Real Tpow = T > T_cond_max ? pow(T_cond_max,2.5) : pow(T,2.5);
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * Tpow;
       }
     }
   }
@@ -1309,7 +1452,8 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
     for (int j=js; j<=je; ++j) {
       for (int i=is+1; i<=ie; ++i) {
         Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
-        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * std::max(1.0 , pow( T/T_cond_max ,2.5));
+        Real Tpow = T > T_cond_max ? pow(T_cond_max,2.5) : pow(T,2.5);
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * Tpow;
       }
     }
   }
