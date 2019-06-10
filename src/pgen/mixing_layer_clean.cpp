@@ -386,7 +386,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real beta = pin->GetOrAddReal("problem", "beta", 100.0);
   int B_direction = pin->GetOrAddInteger("problem", "B_direction", 0); // 0 = x, 1 = y, 2 = z
 
-  Real lambda_pert_2 = pin->GetOrAddReal("problem", "lambda_pert",0.0);
+  Real lambda_pert_2 = pin->GetOrAddReal("problem", "lambda_pert_2",0.0);
   Real lambda_pert_2_phase = pin->GetOrAddReal("problem", "lambda_pert_2_phase",0.0);
 
   if(Globals::my_rank==0) {
