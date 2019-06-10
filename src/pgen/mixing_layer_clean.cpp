@@ -389,6 +389,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real lambda_pert_2 = pin->GetOrAddReal("problem", "lambda_pert",0.0);
   Real lambda_pert_2_phase = pin->GetOrAddReal("problem", "lambda_pert_2_phase",0.0);
 
+  if(Globals::my_rank==0) {
+    std::cout << "lambda_pert = " << lambda_pert << "\n";
+    std::cout << "lambda_pert_2 = " << lambda_pert_2 << "\n";
+    std::cout << "lambda_pert_2_phase = " << lambda_pert_2_phase << "\n";
+  }
+
 
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
@@ -402,7 +408,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IPR,k,j,i) = pgas_0*scale_temperature;
           phydro->w(IVX,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
           phydro->w(IVY,k,j,i) = 0.0;
-          phydro->w(IVZ,k,j,i) = velocity_pert * (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
+          phydro->w(IVZ,k,j,i) = velocity_pert;
+          phydro->w(IVZ,k,j,i) *= (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness)));
+          phydro->w(IVZ,k,j,i) *= std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
           if (lambda_pert_2 > 0.0){
             phydro->w(IVZ,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase) * std::sin((2*PI*y/lambda_pert_2)+2*PI*lambda_pert_2_phase);
           }
