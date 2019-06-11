@@ -19,6 +19,7 @@
 #include "../hydro/hydro.hpp"              // Hydro
 #include "../fft/turbulence.hpp"           // Turbulence
 #include "../hydro/hydro_diffusion/hydro_diffusion.hpp" // diffusion
+#include "../utils/utils.hpp" //ran2()
 
 // External library headers
 #include <hdf5.h>  // H5*, hid_t, hsize_t, H5*()
@@ -395,6 +396,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     std::cout << "lambda_pert_2_phase = " << lambda_pert_2_phase << "\n";
   }
 
+  bool noisy_IC = pin->GetOrAddBoolean("problem", "noisy_IC", false);
+  // Ensure a different initial random seed for each meshblock.
+  int64_t iseed = -1 - gid;
+
 
   // Initialize primitive values
   for (int k = kl; k <= ku; ++k) {
@@ -414,6 +419,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           if (lambda_pert_2 > 0.0){
             phydro->w(IVZ,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase) * std::sin((2*PI*y/lambda_pert_2)+2*PI*lambda_pert_2_phase);
           }
+          if (noisy_IC){
+            phydro->w(IVZ,k,j,i) *= ran2(&iseed); 
+          }
           phydro->w(IVZ,k,j,i) += bulk_velocity_z;
         } else if (block_size.nx2 > 1) {
           phydro->w(IDN,k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ) );
@@ -422,6 +430,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
           if (lambda_pert_2 > 0.0){
             phydro->w(IVY,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase);
+          }
+          if (noisy_IC){
+            phydro->w(IVY,k,j,i) *= ran2(&iseed); 
           }
           phydro->w(IVZ,k,j,i) = 0.0;
         } else {
