@@ -345,7 +345,7 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
 {
   // Readjust cooling if necessary
   if ( Lambda_ramp_down ){
-    if ( fmod(t,dt_Lambda_ramp_down) < dt ) {
+    if (( fmod(t,dt_Lambda_ramp_down) < dt ) && (t > t_cool_start)){
       Lambda_cool -= delta_Lambda_ramp_down;
       if(Globals::my_rank==0) {
         std::cout << "decreased cooling, Lambda_cool = " << Lambda_cool << "\n";
