@@ -61,6 +61,8 @@ static Real dt_cutoff, cfl_cool;
 static int nstages;
 static Real weights[4];
 static bool adaptive_driving;
+static bool Lambda_ramp_down;
+static Real dt_Lambda_ramp_down, delta_Lambda_ramp_down;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -97,11 +99,15 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Read cooling-table-related parameters from input file
   t_cool_start = pin->GetReal("problem", "t_cool_start");
-  dt_cutoff = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
-  cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
-  Lambda_cool = pin->GetReal("problem", "Lambda_cool");
-  Lambda_hot = pin->GetOrAddReal("problem", "Lambda_hot",1.0);
-  s_Lambda = pin->GetReal("problem", "s_Lambda");
+  dt_cutoff    = pin->GetOrAddReal("problem", "dt_cutoff", 3.0e-5);
+  cfl_cool     = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
+  Lambda_cool  = pin->GetReal("problem", "Lambda_cool");
+  Lambda_hot   = pin->GetOrAddReal("problem", "Lambda_hot",1.0);
+  s_Lambda     = pin->GetReal("problem", "s_Lambda");
+
+  Lambda_ramp_down       = pin->GetOrAddBoolean("problem", "Lambda_ramp_down", false);
+  dt_Lambda_ramp_down    = pin->GetOrAddReal("problem", "dt_Lambda_ramp_down",1.0);
+  delta_Lambda_ramp_down = pin->GetOrAddReal("problem", "delta_Lambda_ramp_down",0.1);
 
   Tmin = pgas_0/rho_0 / density_contrast;
   Tmax = pgas_0/rho_0;
@@ -337,6 +343,16 @@ Real cooling_timestep(MeshBlock *pmb)
 void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
     const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
 {
+  // Readjust cooling if necessary
+  if ( Lambda_ramp_down ){
+    if ( fmod(t,dt_Lambda_ramp_down) < dt ) {
+      Lambda_cool -= delta_Lambda_ramp_down;
+      if(Globals::my_rank==0) {
+        std::cout << "decreased cooling, Lambda_cool = " << Lambda_cool << "\n";
+      }
+    }
+  }
+
   // Extract indices
   int is = pmb->is;
   int ie = pmb->ie;
