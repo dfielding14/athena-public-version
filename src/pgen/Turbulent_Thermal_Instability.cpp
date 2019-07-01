@@ -62,7 +62,7 @@ static int nstages;
 static Real weights[4];
 static bool adaptive_driving;
 static bool Lambda_ramp_down;
-static Real dt_Lambda_ramp_down, delta_Lambda_ramp_down;
+static Real dt_Lambda_ramp_down, delta_Lambda_ramp_down, Lambda_cool_init ;
 
 //----------------------------------------------------------------------------------------
 // Function for preparing Mesh
@@ -105,6 +105,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Lambda_hot   = pin->GetOrAddReal("problem", "Lambda_hot",1.0);
   s_Lambda     = pin->GetReal("problem", "s_Lambda");
 
+  Lambda_cool_init = Lambda_cool;
   Lambda_ramp_down       = pin->GetOrAddBoolean("problem", "Lambda_ramp_down", false);
   dt_Lambda_ramp_down    = pin->GetOrAddReal("problem", "dt_Lambda_ramp_down",1.0);
   delta_Lambda_ramp_down = pin->GetOrAddReal("problem", "delta_Lambda_ramp_down",0.1);
@@ -346,7 +347,8 @@ void Cooling_Source_Function(MeshBlock *pmb, const Real t, const Real dt,
   // Readjust cooling if necessary
   if ( Lambda_ramp_down ){
     if (( fmod(t,dt_Lambda_ramp_down) < dt ) && (t > t_cool_start)){
-      Lambda_cool -= delta_Lambda_ramp_down;
+      Lambda_cool = Lambda_cool_init - floor((t-t_cool_start)/dt_Lambda_ramp_down) * delta_Lambda_ramp_down
+      Lambda_cool = Lambda_cool<0.0 ? 0.0 : Lambda_cool;
       if(Globals::my_rank==0) {
         std::cout << "decreased cooling, Lambda_cool = " << Lambda_cool << "\n";
       }
