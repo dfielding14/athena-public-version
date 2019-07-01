@@ -313,7 +313,7 @@ Real cooling_timestep(MeshBlock *pmb)
     return 1.0e-6;
   } else {
     Real min_dt=1.0e10;
-    if (t > t_cool_start) {
+    if (pmb->pmy_mesh->time > t_cool_start) {
       for (int k=pmb->ks; k<=pmb->ke; ++k) {
         for (int j=pmb->js; j<=pmb->je; ++j) {
           for (int i=pmb->is; i<=pmb->ie; ++i) {
