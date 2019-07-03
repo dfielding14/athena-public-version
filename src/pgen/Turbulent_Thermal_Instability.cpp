@@ -313,16 +313,18 @@ Real cooling_timestep(MeshBlock *pmb)
     return 1.0e-6;
   } else {
     Real min_dt=1.0e10;
-    for (int k=pmb->ks; k<=pmb->ke; ++k) {
-      for (int j=pmb->js; j<=pmb->je; ++j) {
-        for (int i=pmb->is; i<=pmb->ie; ++i) {
-          Real dt;
-          Real press = pmb->phydro->w(IPR,k,j,i);
-          Real dens = pmb->phydro->w(IDN,k,j,i);
-          Real edot = fabs(edot_cool(press,dens));
-          dt = cfl_cool * 1.5*press/edot;
-          dt = std::max( dt , dt_cutoff );
-          min_dt = std::min(min_dt, dt);
+    if (pmb->pmy_mesh->time > t_cool_start) {
+      for (int k=pmb->ks; k<=pmb->ke; ++k) {
+        for (int j=pmb->js; j<=pmb->je; ++j) {
+          for (int i=pmb->is; i<=pmb->ie; ++i) {
+            Real dt;
+            Real press = pmb->phydro->w(IPR,k,j,i);
+            Real dens = pmb->phydro->w(IDN,k,j,i);
+            Real edot = fabs(edot_cool(press,dens));
+            dt = cfl_cool * 1.5*press/edot;
+            dt = std::max( dt , dt_cutoff );
+            min_dt = std::min(min_dt, dt);
+          }
         }
       }
     }
