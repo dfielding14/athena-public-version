@@ -413,14 +413,20 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IPR,k,j,i) = pgas_0*scale_temperature;
           phydro->w(IVX,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ));
           phydro->w(IVY,k,j,i) = 0.0;
-          phydro->w(IVZ,k,j,i) = velocity_pert;
-          phydro->w(IVZ,k,j,i) *= (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness)));
-          phydro->w(IVZ,k,j,i) *= std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
-          if (lambda_pert_2 > 0.0){
-            phydro->w(IVZ,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase) * std::sin((2*PI*y/lambda_pert_2)+2*PI*lambda_pert_2_phase);
-          }
-          if (noisy_IC){
-            phydro->w(IVZ,k,j,i) *= ran2(&iseed); 
+          if (lambda_pert > 0.0){
+            phydro->w(IVZ,k,j,i) = velocity_pert;
+            phydro->w(IVZ,k,j,i) *= (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness)));
+            phydro->w(IVZ,k,j,i) *= std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
+            if (lambda_pert_2 > 0.0){
+              phydro->w(IVZ,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase) * std::sin((2*PI*y/lambda_pert_2)+2*PI*lambda_pert_2_phase);
+            }
+            if (noisy_IC){
+              phydro->w(IVZ,k,j,i) *= ran2(&iseed); 
+            }
+          } else {
+            if (noisy_IC){
+              phydro->w(IVZ,k,j,i) += velocity_pert * ran2(&iseed); 
+            }
           }
           phydro->w(IVZ,k,j,i) += bulk_velocity_z;
         } else if (block_size.nx2 > 1) {
