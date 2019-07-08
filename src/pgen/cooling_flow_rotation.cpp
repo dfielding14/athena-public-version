@@ -568,6 +568,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     ku += (NGHOST);
   }
 
+  bool noisy_IC = pin->GetOrAddBoolean("problem", "noisy_IC", false);
+  // Ensure a different initial random seed for each meshblock.
+  int64_t iseed = -1 - gid;
+
+  Real dpert = pin->GetReal("problem", "dpert");
+
 
   Real phi_ta = fabs(grav_pot(rvir));
   Real vc_ta  = sqrt( grav_accel(rvir) * rvir );
@@ -604,6 +610,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IVX,k,j,i) = 0.0;
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = -v_phi; // negative to make net ang mom positive
+
+        if ((noisy_IC)&&(turb_flag==0)){
+          phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
+        }
+
 // Configuration checking
 #if MAGNETIC_FIELDS_ENABLED
         pfield->b.x1f(k,j,i) = 0.0;
