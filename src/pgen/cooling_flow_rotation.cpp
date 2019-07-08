@@ -19,6 +19,7 @@
 #include "../field/field.hpp"              // Field
 #include "../hydro/hydro.hpp"              // Hydro
 #include "../fft/turbulence.hpp"           // Turbulence
+#include "../utils/utils.hpp" //ran2()
 
 // External library headers
 #include <hdf5.h>  // H5*, hid_t, hsize_t, H5*()
@@ -611,7 +612,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = -v_phi; // negative to make net ang mom positive
 
-        if ((noisy_IC)&&(turb_flag==0)){
+        if ((noisy_IC)&&(pmy_mesh->turb_flag==0)){
           phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
         }
 
