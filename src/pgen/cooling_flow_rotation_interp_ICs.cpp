@@ -636,6 +636,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IVX,k,j,i) = -vr;
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = -vphi;
+
+        if ((noisy_IC)&&(pmy_mesh->turb_flag==0)){
+          phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
+        }
+
 // Configuration checking
 #if MAGNETIC_FIELDS_ENABLED
         pfield->b.x1f(k,j,i) = 0.0;
