@@ -67,7 +67,7 @@ static bool rotation;
 static Real lambda, r_circ;
 
 static Real vr_outer, vphi_outer, rho_outer, press_outer;
-static Mdot_factor, t_Mdot_start, t_Mdot_slope ; 
+static Real Mdot_factor, t_Mdot_start, t_Mdot_slope ; 
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
