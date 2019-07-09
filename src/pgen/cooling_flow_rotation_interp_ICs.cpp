@@ -215,9 +215,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
 
   // outer BC params
-  Mdot_factor   = pin->GetOrAddReal("problem", "Mdot_factor", 0.0)
-  t_Mdot_start = pin->GetOrAddReal("problem", "t_Mdot_start", 0.0)
-  t_Mdot_slope = pin->GetOrAddReal("problem", "t_Mdot_slope", 0.0)
+  Mdot_factor   = pin->GetOrAddReal("problem", "Mdot_factor", 0.0);
+  t_Mdot_start = pin->GetOrAddReal("problem", "t_Mdot_start", 0.0);
+  t_Mdot_slope = pin->GetOrAddReal("problem", "t_Mdot_slope", 0.0);
 
   if(Globals::my_rank==0) {
     std::cout << " Mhalo = " << Mhalo << "\n";
