@@ -635,7 +635,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IPR,k,j,i) = press;
         phydro->w(IVX,k,j,i) = -vr;
         phydro->w(IVY,k,j,i) = 0.0;
-        phydro->w(IVZ,k,j,i) = -v_phi;
+        phydro->w(IVZ,k,j,i) = -vphi;
 // Configuration checking
 #if MAGNETIC_FIELDS_ENABLED
         pfield->b.x1f(k,j,i) = 0.0;
@@ -1243,7 +1243,7 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         prim(IDN,k,j,ie+i) = rho_outer;
         prim(IVX,k,j,ie+i) = -vr_outer;
         prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -v_phi;
+        prim(IVZ,k,j,ie+i) = -vphi_outer;
         prim(IPR,k,j,ie+i) = press_outer; 
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
@@ -1278,7 +1278,7 @@ void EvolvingOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         prim(IPR,k,j,ie+i) = press_outer * factor; 
         prim(IVX,k,j,ie+i) = -vr_outer;
         prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -v_phi;
+        prim(IVZ,k,j,ie+i) = -vphi_outer;
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
