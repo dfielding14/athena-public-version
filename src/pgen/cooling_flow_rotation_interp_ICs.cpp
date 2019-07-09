@@ -67,7 +67,7 @@ static bool rotation;
 static Real lambda, r_circ;
 
 static Real vr_outer, vphi_outer, rho_outer, press_outer;
-static Mdot_final, t_Mdot_start, t_Mdot_slope ; 
+static Mdot_factor, t_Mdot_start, t_Mdot_slope ; 
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
@@ -215,7 +215,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
 
   // outer BC params
-  Mdot_final   = pin->GetOrAddReal("problem", "Mdot_final", 0.0)
+  Mdot_factor   = pin->GetOrAddReal("problem", "Mdot_factor", 0.0)
   t_Mdot_start = pin->GetOrAddReal("problem", "t_Mdot_start", 0.0)
   t_Mdot_slope = pin->GetOrAddReal("problem", "t_Mdot_slope", 0.0)
 
@@ -508,7 +508,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Enroll no inflow boundary condition but only if it is turned on
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
-    if (Mdot_final <= 0.){
+    if (Mdot_factor <= 1.){
       EnrollUserBoundaryFunction(OUTER_X1, ConstantOuterX1);
     } else {
       EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuterX1);
