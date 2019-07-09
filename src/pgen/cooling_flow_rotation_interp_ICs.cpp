@@ -1274,7 +1274,7 @@ void EvolvingOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 {
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-      for (int i=1; i<=(NGHOST); ++i) {
+      for (int i=0; i<=(NGHOST); ++i) {
         Real factor = 1.0;
         if (pmb->pmy_mesh->time >= t_Mdot_start){
           factor = 1.0 + (Mdot_factor-1.0)*(pmb->pmy_mesh->time - t_Mdot_start)/t_Mdot_slope;
