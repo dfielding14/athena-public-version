@@ -661,12 +661,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   peos->PrimitiveToConserved(phydro->w, bb, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   bb.DeleteAthenaArray();
 
-  interp_r_kpc.DeleteAthenaArray();
-  interp_vr.DeleteAthenaArray();
-  interp_vphi.DeleteAthenaArray();
-  interp_rho.DeleteAthenaArray();
-  interp_press.DeleteAthenaArray();
-
   if(Globals::my_rank==0) {
     std::cout << " problem generated \n";
   }
@@ -687,6 +681,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     std::cout << " rho_outer = " << rho_outer << "\n";
     std::cout << " press_outer = " << press_outer << "\n";
   }
+
+  interp_r_kpc.DeleteAthenaArray();
+  interp_vr.DeleteAthenaArray();
+  interp_vphi.DeleteAthenaArray();
+  interp_rho.DeleteAthenaArray();
+  interp_press.DeleteAthenaArray();
+
 
   return;
 }
