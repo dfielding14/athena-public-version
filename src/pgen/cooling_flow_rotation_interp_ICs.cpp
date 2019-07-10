@@ -66,7 +66,8 @@ static Real r_inner, r_outer;
 static bool rotation;
 static Real lambda, r_circ;
 
-static Real vr_outer, vphi_outer, rho_outer, press_outer;
+static Real vr_outer, vphi_outer, rho_outer, press_outer
+static Real vr_outer1, vphi_outer1, rho_outer1, press_outer1;
 static Real Mdot_factor, t_Mdot_start, t_Mdot_slope ; 
 
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -157,6 +158,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // ICs
   r_inner      = mesh_size.x1min;
   r_outer      = mesh_size.x1max;
+  r_ratio      = mesh_size.x1rat;
   rho_ta       = pin->GetReal("problem", "rho_ta")/rho_scale;
   
   // floor
@@ -668,18 +670,28 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   // get outer BC values
   int r_kpc_index;
   Real r_kpc_fraction;
-  FindIndex(interp_r_kpc, r_outer, &r_kpc_index, &r_kpc_fraction);
+  FindIndex(interp_r_kpc, r_outer*r_ratio, &r_kpc_index, &r_kpc_fraction);
   // interpolate
   vr_outer      = Interpolate1D(interp_vr, r_kpc_index, r_kpc_fraction);
   vphi_outer    = Interpolate1D(interp_vphi, r_kpc_index, r_kpc_fraction);
   rho_outer     = Interpolate1D(interp_rho, r_kpc_index, r_kpc_fraction);
   press_outer   = Interpolate1D(interp_press, r_kpc_index, r_kpc_fraction);
+  FindIndex(interp_r_kpc, r_outer*SQR(r_ratio), &r_kpc_index, &r_kpc_fraction);
+  // interpolate
+  vr_outer1      = Interpolate1D(interp_vr, r_kpc_index, r_kpc_fraction);
+  vphi_outer1    = Interpolate1D(interp_vphi, r_kpc_index, r_kpc_fraction);
+  rho_outer1     = Interpolate1D(interp_rho, r_kpc_index, r_kpc_fraction);
+  press_outer1   = Interpolate1D(interp_press, r_kpc_index, r_kpc_fraction);
 
   if(Globals::my_rank==0) {
     std::cout << " vr_outer = " << vr_outer << "\n";
     std::cout << " vphi_outer = " << vphi_outer << "\n";
     std::cout << " rho_outer = " << rho_outer << "\n";
     std::cout << " press_outer = " << press_outer << "\n";
+    std::cout << " vr_outer1 = " << vr_outer1 << "\n";
+    std::cout << " vphi_outer1 = " << vphi_outer1 << "\n";
+    std::cout << " rho_outer1 = " << rho_outer1 << "\n";
+    std::cout << " press_outer1 = " << press_outer1 << "\n";
   }
 
   interp_r_kpc.DeleteAthenaArray();
@@ -1274,17 +1286,25 @@ void EvolvingOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 {
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-      for (int i=0; i<=(NGHOST); ++i) {
+      for (int i=1; i<=(NGHOST); ++i) {
         Real factor = 1.0;
         if (pmb->pmy_mesh->time >= t_Mdot_start){
           factor = 1.0 + (Mdot_factor-1.0)*(pmb->pmy_mesh->time - t_Mdot_start)/t_Mdot_slope;
           factor = factor > Mdot_factor ? Mdot_factor : factor;
         }
-        prim(IDN,k,j,ie+i) = rho_outer * factor;
-        prim(IPR,k,j,ie+i) = press_outer * factor; 
-        prim(IVX,k,j,ie+i) = -vr_outer;
-        prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -vphi_outer;
+        if (i==1){
+          prim(IDN,k,j,ie+i) = rho_outer * factor;
+          prim(IPR,k,j,ie+i) = press_outer * factor; 
+          prim(IVX,k,j,ie+i) = -vr_outer;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer;
+        } else {
+          prim(IDN,k,j,ie+i) = rho_outer1 * factor;
+          prim(IPR,k,j,ie+i) = press_outer1 * factor; 
+          prim(IVX,k,j,ie+i) = -vr_outer1;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer1;
+        }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
