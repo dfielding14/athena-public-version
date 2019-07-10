@@ -61,7 +61,7 @@ static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs,f2;
 static Real T_SF, rho_max;
 
-static Real r_inner, r_outer;
+static Real r_inner, r_outer, r_ratio;
 
 static bool rotation;
 static Real lambda, r_circ;
