@@ -66,7 +66,7 @@ static Real r_inner, r_outer;
 static bool rotation;
 static Real lambda, r_circ;
 
-static Real vr_outer, vphi_outer, rho_outer, press_outer
+static Real vr_outer, vphi_outer, rho_outer, press_outer;
 static Real vr_outer1, vphi_outer1, rho_outer1, press_outer1;
 static Real Mdot_factor, t_Mdot_start, t_Mdot_slope ; 
 
