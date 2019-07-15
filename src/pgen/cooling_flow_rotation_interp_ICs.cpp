@@ -80,6 +80,8 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void EvolvingOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void EvolvingOuter_velocity_X1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void ConstantWindX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 
@@ -513,7 +515,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     if (Mdot_factor <= 1.){
       EnrollUserBoundaryFunction(OUTER_X1, ConstantOuterX1);
     } else {
-      EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuterX1);
+      if (pin->GetOrAddBoolean("problem", "velocity_BC", false)){
+        EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuter_velocity_X1);
+      } else {
+        EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuterX1);
+      }
     }
   }
   if(mesh_bcs[INNER_X1] == GetBoundaryFlag("user")) {
@@ -1263,6 +1269,48 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         prim(IVY,k,j,ie+i) = 0.0;
         prim(IVZ,k,j,ie+i) = -vphi_outer;
         prim(IPR,k,j,ie+i) = press_outer; 
+#if MAGNETIC_FIELDS_ENABLED
+        b.x1f(k,j,ie+i) = 0.0;
+        b.x2f(k,j,ie+i) = 0.0;
+        b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+#endif
+      }
+    }
+  }
+  return;
+}
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void EvolvingOuter_velocity_X1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief Wind boundary conditions with no inflow, inner x1 boundary
+
+void EvolvingOuter_velocity_X1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=1; i<=(NGHOST); ++i) {
+        Real factor = 1.0;
+        if (pmb->pmy_mesh->time >= t_Mdot_start){
+          factor = 1.0 + (Mdot_factor-1.0)*(pmb->pmy_mesh->time - t_Mdot_start)/t_Mdot_slope;
+          factor = factor > Mdot_factor ? Mdot_factor : factor;
+        }
+        if (i==1){
+          prim(IDN,k,j,ie+i) = rho_outer * sqrt(factor);
+          prim(IPR,k,j,ie+i) = press_outer * sqrt(factor); 
+          prim(IVX,k,j,ie+i) = -vr_outer * sqrt(factor);
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer;
+        } else {
+          prim(IDN,k,j,ie+i) = rho_outer1 * sqrt(factor);
+          prim(IPR,k,j,ie+i) = press_outer1 * sqrt(factor); 
+          prim(IVX,k,j,ie+i) = -vr_outer1 * sqrt(factor);
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer1;
+        }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
