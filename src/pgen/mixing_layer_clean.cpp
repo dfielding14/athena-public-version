@@ -700,15 +700,24 @@ Real history_recorder(MeshBlock *pmb, int iout)
 
 //----------------------------------------------------------------------------------------
 // calculated edot_cool 
-
+// the cooling curve is set to be a log-normal distribution with a maximum equal to
+// Lambda_cool * ( 1 - epsilon ~ 0.1-2% ). 
+// The volumetric cooling rate is density**2 * Lambda(T)
 static Real edot_cool(Real press, Real dens)
 {
   Real T = press/dens;
-  Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
-  Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
+  Real log_normal = (Tmix/T) * std::exp( -SQR((std::log(T) - M)) /(2.*SQR(s_Lambda)) + 0.5*SQR(s_Lambda));
+  Real log_normal_min = (Tmix/Tmin) * std::exp( -SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda)) + 0.5*SQR(s_Lambda));
   return Lambda_cool * SQR(dens) * std::max(log_normal-log_normal_min,0.0);
 }
 
+// Below is the original version which did not account for the fact that maximum of a log normal > 1.
+// {
+//   Real T = press/dens;
+//   Real log_normal = std::exp(-SQR((std::log(T) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*T*sqrt(2.*PI)) ; 
+//   Real log_normal_min = std::exp(-SQR((std::log(Tmin) - M)) /(2.*SQR(s_Lambda))) / (s_Lambda*Tmin*sqrt(2.*PI)) ;
+//   return Lambda_cool * SQR(dens) * std::max(log_normal-log_normal_min,0.0);
+// }
 
 //----------------------------------------------------------------------------------------
 //! \fn void ConstantShearInflowInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
