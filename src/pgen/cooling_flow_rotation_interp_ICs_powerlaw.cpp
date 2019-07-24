@@ -183,7 +183,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   T_SF          = pin->GetOrAddReal("problem", "T_SF", 3.e4);
 
   // Gravity
-  vc_0         = pin->GetReal("problem", "vc_0", 90.67415e5)/vel_scale; // in Msun
+  vc_0         = pin->GetOrAddReal("problem", "vc_0", 90.67415e5)/vel_scale; // in Msun
   Mhalo        = pin->GetReal("problem", "Mhalo"); // in Msun
   Mgal         = pin->GetReal("problem", "Mgal"); // in Msun
   Rgal         = pin->GetReal("problem", "Rgal") * kpc/length_scale; // effective radius entered in kpc and converted to code units and hernquist length
