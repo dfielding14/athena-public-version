@@ -232,7 +232,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   t_Mdot_slope = pin->GetOrAddReal("problem", "t_Mdot_slope", 0.0);
 
   if(Globals::my_rank==0) {
-    std::cout << " nH_cool = " << nH_cool << "\n";
     std::cout << " Mhalo = " << Mhalo << "\n";
     std::cout << " Mgal = " << Mgal << "\n";
     std::cout << " cnfw = " << cnfw << "\n";
@@ -859,7 +858,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             // Locate density and pressure in table
             int rho_index;
             Real rho_fraction;
-            FindIndex(rho_table, nH_cool, &rho_index, &rho_fraction);
+            FindIndex(rho_table, rho, &rho_index, &rho_fraction);
             int pgas_index;
             Real pgas_fraction;
             FindIndex(pgas_table, pgas, &pgas_index, &pgas_fraction);
@@ -1257,11 +1256,19 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-        prim(IDN,k,j,ie+i) = rho_outer;
-        prim(IVX,k,j,ie+i) = -vr_outer;
-        prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -vphi_outer;
-        prim(IPR,k,j,ie+i) = press_outer; 
+        if (i==1){
+          prim(IDN,k,j,ie+i) = rho_outer;
+          prim(IPR,k,j,ie+i) = press_outer; 
+          prim(IVX,k,j,ie+i) = -vr_outer;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer;
+        } else {
+          prim(IDN,k,j,ie+i) = rho_outer1;
+          prim(IPR,k,j,ie+i) = press_outer1; 
+          prim(IVX,k,j,ie+i) = -vr_outer1;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer1;
+        }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
