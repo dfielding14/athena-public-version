@@ -1237,7 +1237,6 @@ static Real Interpolate3D(const AthenaArray<double> &table, int k, int j, int i,
 
 
 
-
 //----------------------------------------------------------------------------------------
 //! \fn void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 //                          FaceField &b, Real time, Real dt,
@@ -1250,11 +1249,19 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-        prim(IDN,k,j,ie+i) = rho_outer;
-        prim(IVX,k,j,ie+i) = -vr_outer;
-        prim(IVY,k,j,ie+i) = 0.0;
-        prim(IVZ,k,j,ie+i) = -vphi_outer;
-        prim(IPR,k,j,ie+i) = press_outer; 
+        if (i==1){
+          prim(IDN,k,j,ie+i) = rho_outer;
+          prim(IPR,k,j,ie+i) = press_outer; 
+          prim(IVX,k,j,ie+i) = -vr_outer;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer;
+        } else {
+          prim(IDN,k,j,ie+i) = rho_outer1;
+          prim(IPR,k,j,ie+i) = press_outer1; 
+          prim(IVX,k,j,ie+i) = -vr_outer1;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vphi_outer1;
+        }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
         b.x2f(k,j,ie+i) = 0.0;
