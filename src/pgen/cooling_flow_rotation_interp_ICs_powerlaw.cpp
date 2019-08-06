@@ -66,6 +66,7 @@ static Real r_inner, r_outer, r_ratio;
 
 static bool rotation;
 static Real lambda, r_circ;
+static Real r_circ_target, r_circ_time;
 
 static Real vr_outer, vphi_outer, rho_outer, press_outer;
 static Real vr_outer1, vphi_outer1, rho_outer1, press_outer1;
@@ -80,6 +81,8 @@ void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
 void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void EvolvingOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void EvolvingRotationOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void EvolvingOuter_velocity_X1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
@@ -221,9 +224,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
 
   // outer BC params
-  Mdot_factor   = pin->GetOrAddReal("problem", "Mdot_factor", 0.0);
+  Mdot_factor  = pin->GetOrAddReal("problem", "Mdot_factor", 0.0);
   t_Mdot_start = pin->GetOrAddReal("problem", "t_Mdot_start", 0.0);
   t_Mdot_slope = pin->GetOrAddReal("problem", "t_Mdot_slope", 0.0);
+
+  r_circ_target = pin->GetOrAddReal("problem", "r_circ_target", 0.0);
+  r_circ_time = pin->GetOrAddReal("problem", "r_circ_time", 0.0);
 
   if(Globals::my_rank==0) {
     std::cout << " Mhalo = " << Mhalo << "\n";
@@ -519,6 +525,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     } else {
       if (pin->GetOrAddBoolean("problem", "velocity_BC", false)){
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuter_velocity_X1);
+      } else if (pin->GetOrAddBoolean("problem", "rotation_BC", false)) {
+        EnrollUserBoundaryFunction(OUTER_X1, EvolvingRotationOuterX1);
       } else {
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuterX1);
       }
@@ -1345,6 +1353,50 @@ void EvolvingOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
           prim(IVX,k,j,ie+i) = -vr_outer1;
           prim(IVY,k,j,ie+i) = 0.0;
           prim(IVZ,k,j,ie+i) = -vphi_outer1;
+        }
+#if MAGNETIC_FIELDS_ENABLED
+        b.x1f(k,j,ie+i) = 0.0;
+        b.x2f(k,j,ie+i) = 0.0;
+        b.x3f(k,j,ie+i) = sqrt(8*PI*rho_wind*SQR(cs_wind)/beta); // beta = P_Th/P_Mag ==> P_Mag = P_Th / beta ==> B = sqrt(8 pi P_th / beta )
+#endif
+      }
+    }
+  }
+  return;
+}
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void EvolvingRotationOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//  \brief Wind boundary conditions with no inflow, inner x1 boundary
+
+void EvolvingRotationOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=1; i<=(NGHOST); ++i) {
+        Real factor = 1.0;
+        if (pmb->pmy_mesh->time >= t_Mdot_start){
+          factor = 1.0 + (Mdot_factor-1.0)*(pmb->pmy_mesh->time - t_Mdot_start)/t_Mdot_slope;
+          factor = factor > Mdot_factor ? Mdot_factor : factor;
+        }
+        Real r = pmb->pcoord->x1v(ie+i);
+        if (i==1){
+          prim(IDN,k,j,ie+i) = rho_outer;
+          prim(IPR,k,j,ie+i) = press_outer; 
+          prim(IVX,k,j,ie+i) = -vr_outer;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vc_0 * (r_circ_target * std::max(1.,time/r_circ_time))/r;
+        } else {
+          prim(IDN,k,j,ie+i) = rho_outer1;
+          prim(IPR,k,j,ie+i) = press_outer1; 
+          prim(IVX,k,j,ie+i) = -vr_outer1;
+          prim(IVY,k,j,ie+i) = 0.0;
+          prim(IVZ,k,j,ie+i) = -vc_0 * (r_circ_target * std::max(1.,time/r_circ_time))/r;
         }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
