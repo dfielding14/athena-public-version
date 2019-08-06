@@ -526,6 +526,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
       if (pin->GetOrAddBoolean("problem", "velocity_BC", false)){
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuter_velocity_X1);
       } else if (pin->GetOrAddBoolean("problem", "rotation_BC", false)) {
+        if(Globals::my_rank==0) {
+          std::cout << " EvolvingRotationOuterX1 On with r_circ_target = " << r_circ_target << " r_circ_time = " << r_circ_time << "\n";
+        }
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingRotationOuterX1);
       } else {
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuterX1);
@@ -1379,11 +1382,6 @@ void EvolvingRotationOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real>
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=1; i<=(NGHOST); ++i) {
-        Real factor = 1.0;
-        if (pmb->pmy_mesh->time >= t_Mdot_start){
-          factor = 1.0 + (Mdot_factor-1.0)*(pmb->pmy_mesh->time - t_Mdot_start)/t_Mdot_slope;
-          factor = factor > Mdot_factor ? Mdot_factor : factor;
-        }
         Real r = pmb->pcoord->x1v(ie+i);
         if (i==1){
           prim(IDN,k,j,ie+i) = rho_outer;
@@ -1391,6 +1389,9 @@ void EvolvingRotationOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real>
           prim(IVX,k,j,ie+i) = -vr_outer;
           prim(IVY,k,j,ie+i) = 0.0;
           prim(IVZ,k,j,ie+i) = -vc_0 * (r_circ_target * std::max(1.,time/r_circ_time))/r;
+          if(Globals::my_rank==0) {
+            std::cout << " prim(IVZ,k,j,ie+i) = " << -vc_0 * (r_circ_target * std::max(1.,time/r_circ_time))/r << " (r_circ_target * std::max(1.,time/r_circ_time))/r = " << (r_circ_target * std::max(1.,time/r_circ_time))/r << "\n";
+          }
         } else {
           prim(IDN,k,j,ie+i) = rho_outer1;
           prim(IPR,k,j,ie+i) = press_outer1; 
