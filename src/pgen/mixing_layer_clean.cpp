@@ -55,6 +55,11 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
 void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
+void SoundSpeedConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void SoundSpeedViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 
 // Boundary Conditions
 void ConstantShearInflowOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -282,6 +287,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   if (DeviatoricSmagorinskyViscosity_on){
     if (mesh_size.nx2 == 1){
+      if(Globals::my_rank==0) {
+        std::cout << "enrolling DeviatoricSmagorinskyViscosity1D" << "\n";
+      }
       EnrollViscosityCoefficient(DeviatoricSmagorinskyViscosity1D);
     } else {
       EnrollViscosityCoefficient(DeviatoricSmagorinskyViscosity);
@@ -290,6 +298,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
   if (DeviatoricSmagorinskyConduction_on){
     if (mesh_size.nx2 == 1){
+      if(Globals::my_rank==0) {
+        std::cout << "enrolling DeviatoricSmagorinskyConduction1D" << "\n";
+      }
       EnrollConductionCoefficient(DeviatoricSmagorinskyConduction1D);
     } else {
       EnrollConductionCoefficient(DeviatoricSmagorinskyConduction);
@@ -306,6 +317,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if (SpitzerConduction_on){
     EnrollConductionCoefficient(SpitzerConduction);
   }
+
+  bool SoundSpeedViscosity_on = pin->GetOrAddBoolean("problem", "SoundSpeedViscosity_on", false);
+  bool SoundSpeedConduction_on = pin->GetOrAddBoolean("problem", "SoundSpeedConduction_on", false);
+
+  if (SoundSpeedViscosity_on){
+    EnrollViscosityCoefficient(SoundSpeedViscosity);
+  }
+  if (SoundSpeedConduction_on){
+    EnrollConductionCoefficient(SoundSpeedConduction);
+  }
+
 
 
   bool ConstantShearInflowOuterX2_on = pin->GetOrAddBoolean("problem", "ConstantShearInflowOuterX2_on", false);
@@ -1223,7 +1245,7 @@ void ConstantShearInflowOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
             prim(IDN,k,j,ie+i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ) );
           } 
           if ( n == IVY ){
-            prim(IVX,k,j,ie+i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
+            prim(IVY,k,j,ie+i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
           } 
         }
       }
@@ -1285,7 +1307,7 @@ void ConstantShearInflowInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
             prim(IDN,k,j,is-i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ) );
           } 
           if ( n == IVY ){
-            prim(IVX,k,j,is-i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
+            prim(IVY,k,j,is-i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
           } 
         }
       }
@@ -1629,6 +1651,41 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
         Real T = prim(IPR,k,j,i)/prim(IDN,k,j,i);
         Real Tpow = T > T_cond_max ? pow(T_cond_max,2.5) : pow(T,2.5);
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * Tpow;
+      }
+    }
+  }
+  return;
+}
+
+
+// ----------------------------------------------------------------------------------------
+// SoundSpeedViscosity 
+// 
+void SoundSpeedViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real cs = sqrt(prim(IPR,k,j,i)/prim(IDN,k,j,i));
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i) * cs;
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// SoundSpeedConduction 
+// 
+void SoundSpeedConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real cs = sqrt(prim(IPR,k,j,i)/prim(IDN,k,j,i));
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * cs;
       }
     }
   }
