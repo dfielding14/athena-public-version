@@ -1220,7 +1220,7 @@ void ConstantShearInflowOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
             prim(IPR,k,j,ie+i) = pgas_0;
           } 
           if ( n == IDN ){
-            prim(IDN,k,j,ie+i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+            prim(IDN,k,j,ie+i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ) );
           } 
           if ( n == IVY ){
             prim(IVX,k,j,ie+i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
@@ -1282,7 +1282,7 @@ void ConstantShearInflowInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
             prim(IPR,k,j,is-i) = pgas_0;
           } 
           if ( n == IDN ){
-            prim(IDN,k,j,is-i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+            prim(IDN,k,j,is-i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ) );
           } 
           if ( n == IVY ){
             prim(IVX,k,j,is-i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
