@@ -77,6 +77,13 @@ void ConstantShearInflowInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
                     FaceField &b, Real time, Real dt,
                     int is, int ie, int js, int je, int ks, int ke, int ngh);
 
+void ConstantShearInflowOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+void ConstantShearInflowInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+                    FaceField &b, Real time, Real dt,
+                    int is, int ie, int js, int je, int ks, int ke, int ngh);
+
 void ExtrapInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 void ExtrapOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -334,10 +341,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
 
   if(mesh_bcs[INNER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1);
+    EnrollUserBoundaryFunction(INNER_X1, ConstantShearInflowInnerX1);
   }
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
-    EnrollUserBoundaryFunction(OUTER_X1, ExtrapOuterX1);
+    EnrollUserBoundaryFunction(OUTER_X1, ConstantShearInflowOuterX1);
   }
 
   return;
@@ -1189,6 +1196,129 @@ void ConstantShearInflowOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Re
 
 
 
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearInflowOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones outer x1 boundary using second order derivative
+
+void ConstantShearInflowOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          Real x = pco->x1v(ie+i);
+          prim(n,k,j,ie+i) = prim(n,k,j,ie+i);
+          if ( n == IPR ){
+            prim(IPR,k,j,ie+i) = pgas_0;
+          } 
+          if ( n == IDN ){
+            prim(IDN,k,j,ie+i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+          } 
+          if ( n == IVY ){
+            prim(IVX,k,j,ie+i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
+          } 
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x1f(k,j,(ie+i+1)) = b.x1f(k,j,(ie+1));
+      }
+    }}
+
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x2f(k,j,(ie+i)) = b.x2f(k,j,ie);
+      }
+    }}
+
+    for (int k=ks; k<=ke+1; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x3f(k,j,(ie+i)) = b.x3f(k,j,ie);
+      }
+    }}
+  }
+  return;
+}
+
+
+
+
+//----------------------------------------------------------------------------------------
+//! \fn void ConstantShearInflowInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+//                          FaceField &b, Real time, Real dt,
+//                          int is, int ie, int js, int je, int ks, int ke, int ngh)
+//
+//  \brief extrapolate into ghost zones Inner x1 boundary using second order derivative
+
+void ConstantShearInflowInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+  // extrapolate hydro variables into ghost zones
+  for (int n=0; n<(NHYDRO); ++n) {
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=js; j<=je; ++j) {
+        for (int i=1; i<=(NGHOST); ++i) {
+          Real x = pco->x1v(is-i);
+          prim(n,k,j,is-i) = prim(n,k,j,is-i);
+          if ( n == IPR ){
+            prim(IPR,k,j,is-i) = pgas_0;
+          } 
+          if ( n == IDN ){
+            prim(IDN,k,j,is-i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((z-z_bot)/smoothing_thickness) - std::tanh((z-z_top)/smoothing_thickness) ) );
+          } 
+          if ( n == IVY ){
+            prim(IVX,k,j,is-i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
+          } 
+        }
+      }
+    }
+  }
+  // copy face-centered magnetic fields into ghost zones
+  if (MAGNETIC_FIELDS_ENABLED) {
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x1f(k,j,(is-i)) = b.x1f(k,j,is);
+      }
+    }}
+
+    for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je+1; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x2f(k,j,(is-i)) = b.x2f(k,j,is);
+      }
+    }}
+
+    for (int k=ks; k<=ke+1; ++k) {
+    for (int j=js; j<=je; ++j) {
+#pragma simd
+      for (int i=1; i<=(NGHOST); ++i) {
+        b.x3f(k,j,(is-i)) = b.x3f(k,j,is);
+      }
+    }}
+  }
+  return;
+}
 
 
 //----------------------------------------------------------------------------------------
