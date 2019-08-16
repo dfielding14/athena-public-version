@@ -45,9 +45,15 @@ void SmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const Athena
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void SmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
 void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void DeviatoricSmagorinskyViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void DeviatoricSmagorinskyDensityConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void DeviatoricSmagorinskyDensityViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
 void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
@@ -58,6 +64,16 @@ void SpitzerViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<R
 void SoundSpeedConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 void SoundSpeedViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void SoundSpeedDensityConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void SoundSpeedDensityViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+
+void ConstantConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+    const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
+void ConstantViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke);
 
 
@@ -284,6 +300,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   bool DeviatoricSmagorinskyViscosity_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyViscosity_on", false);
   bool DeviatoricSmagorinskyConduction_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyConduction_on", false);
+  bool DeviatoricSmagorinskyDensityViscosity_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyDensityViscosity_on", false);
+  bool DeviatoricSmagorinskyDensityConduction_on = pin->GetOrAddBoolean("problem", "DeviatoricSmagorinskyDensityConduction_on", false);
 
   if (DeviatoricSmagorinskyViscosity_on){
     if (mesh_size.nx2 == 1){
@@ -308,6 +326,23 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     
   }
 
+  if (DeviatoricSmagorinskyDensityViscosity_on){
+    if (mesh_size.nx2 == 1){
+      if(Globals::my_rank==0) {
+        std::cout << "enrolling DeviatoricSmagorinskyDensityViscosity1D" << "\n";
+      }
+      EnrollViscosityCoefficient(DeviatoricSmagorinskyDensityViscosity1D);
+    }     
+  }
+  if (DeviatoricSmagorinskyDensityConduction_on){
+    if (mesh_size.nx2 == 1){
+      if(Globals::my_rank==0) {
+        std::cout << "enrolling DeviatoricSmagorinskyDensityConduction1D" << "\n";
+      }
+      EnrollConductionCoefficient(DeviatoricSmagorinskyDensityConduction1D);
+    }    
+  }
+
   bool SpitzerViscosity_on = pin->GetOrAddBoolean("problem", "SpitzerViscosity_on", false);
   bool SpitzerConduction_on = pin->GetOrAddBoolean("problem", "SpitzerConduction_on", false);
 
@@ -326,6 +361,26 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   }
   if (SoundSpeedConduction_on){
     EnrollConductionCoefficient(SoundSpeedConduction);
+  }
+
+  bool SoundSpeedDensityViscosity_on = pin->GetOrAddBoolean("problem", "SoundSpeedDensityViscosity_on", false);
+  bool SoundSpeedDensityConduction_on = pin->GetOrAddBoolean("problem", "SoundSpeedDensityConduction_on", false);
+
+  if (SoundSpeedDensityViscosity_on){
+    EnrollViscosityCoefficient(SoundSpeedDensityViscosity);
+  }
+  if (SoundSpeedDensityConduction_on){
+    EnrollConductionCoefficient(SoundSpeedDensityConduction);
+  }
+
+  bool ConstantViscosity_on = pin->GetOrAddBoolean("problem", "ConstantViscosity_on", false);
+  bool ConstantConduction_on = pin->GetOrAddBoolean("problem", "ConstantConduction_on", false);
+
+  if (ConstantViscosity_on){
+    EnrollViscosityCoefficient(ConstantViscosity);
+  }
+  if (ConstantConduction_on){
+    EnrollConductionCoefficient(ConstantConduction);
   }
 
 
@@ -1659,6 +1714,38 @@ void SpitzerConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<
 
 
 // ----------------------------------------------------------------------------------------
+// ConstantViscosity 
+// 
+void ConstantViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso/prim(IDN,k,j,i);
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// ConstantConduction 
+// 
+void ConstantConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i);
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
 // SoundSpeedViscosity 
 // 
 void SoundSpeedViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
@@ -1686,6 +1773,41 @@ void SoundSpeedConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArr
       for (int i=is+1; i<=ie; ++i) {
         Real cs = sqrt(prim(IPR,k,j,i)/prim(IDN,k,j,i));
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso/prim(IDN,k,j,i) * cs;
+      }
+    }
+  }
+  return;
+}
+
+
+// ----------------------------------------------------------------------------------------
+// SoundSpeedDensityViscosity 
+// 
+void SoundSpeedDensityViscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real cs = sqrt(prim(IPR,k,j,i)/prim(IDN,k,j,i));
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso * cs;
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// SoundSpeedDensityConduction 
+// 
+void SoundSpeedDensityConduction(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      for (int i=is+1; i<=ie; ++i) {
+        Real cs = sqrt(prim(IPR,k,j,i)/prim(IDN,k,j,i));
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * cs;
       }
     }
   }
@@ -1809,6 +1931,69 @@ void DeviatoricSmagorinskyConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, co
         S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
 
         phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm; 
+      }
+    }
+  }
+  return;
+}
+
+
+
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Viscosity 
+// nu = (C * dx)^2 * |S|
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void DeviatoricSmagorinskyDensityViscosity1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1; //, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->nu(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
+
+        phdif->nu(ISO,k,j,i) = phdif->nu_iso * S_norm / prim(IDN,k,j,i);
+      }
+    }
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------------------
+// Nonlinear Mixing Conduction 
+// kappa = (C * dx)^2 * |S| / Prandtl
+// S_ij = 0.5*(dvelj_dxi + dveli_dxj)
+// |S| = sqrt(2 S_ij S_ij)
+// 
+
+void DeviatoricSmagorinskyDensityConduction1D(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &prim,
+     const AthenaArray<Real> &bcc, int is, int ie, int js, int je, int ks, int ke) 
+{
+  Real dvel1_dx1, dvel2_dx1, dvel3_dx1;//, dvel1_dx2, dvel2_dx2, dvel3_dx2, dvel1_dx3, dvel2_dx3, dvel3_dx3;
+  Real S_norm;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
+      phdif->kappa(ISO,k,j,is) = 0.0;
+      for (int i=is+1; i<=ie; ++i) {
+
+        dvel1_dx1 = (prim(IVX,k,j,i) - prim(IVX,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel2_dx1 = (prim(IVY,k,j,i) - prim(IVY,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+        dvel3_dx1 = (prim(IVZ,k,j,i) - prim(IVZ,k,j,i-1))/pmb->pcoord->dx1v(i-1);
+
+        S_norm = sqrt(4/3. * SQR(dvel1_dx1) + SQR(dvel2_dx1) + SQR(dvel3_dx1));
+
+        phdif->kappa(ISO,k,j,i) = phdif->kappa_iso * S_norm / prim(IDN,k,j,i); 
       }
     }
   }
