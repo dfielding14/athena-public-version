@@ -640,7 +640,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   for (int k = kl; k <= ku; ++k) {
     // Real phi = pcoord->x3v(k);
     for (int j = jl; j <= ju; ++j) {
-      // Real theta = pcoord->x2v(j);
+      Real theta = pcoord->x2v(j);
       for (int i = il; i <= iu; ++i) {
         Real r = pcoord->x1v(i);
         // Locate r in tables
@@ -657,11 +657,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->w(IVX,k,j,i) = -vr;
         phydro->w(IVY,k,j,i) = 0.0;
         phydro->w(IVZ,k,j,i) = -vphi;
-
         if ((noisy_IC)&&(pmy_mesh->turb_flag==0)){
           phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
         }
-
+        if (rotation) {
+          phydro->w(IVZ,k,j,i) = -vc_0 / (r*std::sin(theta))
+        }
 // Configuration checking
 #if MAGNETIC_FIELDS_ENABLED
         pfield->b.x1f(k,j,i) = 0.0;
@@ -1272,6 +1273,11 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
           prim(IVX,k,j,ie+i) = -vr_outer1;
           prim(IVY,k,j,ie+i) = 0.0;
           prim(IVZ,k,j,ie+i) = -vphi_outer1;
+        }
+        if (rotation) {
+          Real r = pcoord->x1v(ie+i);
+          Real theta = pcoord->x2v(j);
+          phydro->w(IVZ,k,j,ie+i) = -vc_0 / (r*std::sin(theta))
         }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
