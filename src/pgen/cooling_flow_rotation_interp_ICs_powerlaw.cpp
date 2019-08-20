@@ -1275,8 +1275,8 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
           prim(IVZ,k,j,ie+i) = -vphi_outer1;
         }
         if (rotation) {
-          Real r = pcoord->x1v(ie+i);
-          Real theta = pcoord->x2v(j);
+          Real r = pco->x1v(ie+i);
+          Real theta = pco->x2v(j);
           phydro->w(IVZ,k,j,ie+i) = -vc_0 / (r*std::sin(theta))
         }
 #if MAGNETIC_FIELDS_ENABLED
