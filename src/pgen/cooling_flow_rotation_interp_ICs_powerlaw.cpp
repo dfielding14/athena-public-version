@@ -661,7 +661,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
         }
         if (rotation) {
-          phydro->w(IVZ,k,j,i) = -vc_0 / (r*std::sin(theta))
+          phydro->w(IVZ,k,j,i) = -vc_0 / (r*std::sin(theta));
         }
 // Configuration checking
 #if MAGNETIC_FIELDS_ENABLED
@@ -1277,7 +1277,7 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
         if (rotation) {
           Real r = pco->x1v(ie+i);
           Real theta = pco->x2v(j);
-          phydro->w(IVZ,k,j,ie+i) = -vc_0 / (r*std::sin(theta))
+          prim(IVZ,k,j,ie+i) = -vc_0 / (r*std::sin(theta));
         }
 #if MAGNETIC_FIELDS_ENABLED
         b.x1f(k,j,ie+i) = 0.0;
