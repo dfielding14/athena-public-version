@@ -662,9 +662,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
         }
         if (rotation) {
-          if(Globals::my_rank==0) std::cout << " -vc_0 / (r*std::sin(theta)) = " << -vc_0 / (r*std::sin(theta)) << "\n";
-
-          phydro->w(IVZ,k,j,i) = -vc_0 / (r*std::sin(theta));
+          if (r*std::sin(theta) > r_circ){
+            phydro->w(IVZ,k,j,i) = -vc_0 * r_circ/(r*std::sin(theta));
+          } else {
+            phydro->w(IVZ,k,j,i) = -vc_0;
+          }
         }
 // Configuration checking
 #if MAGNETIC_FIELDS_ENABLED
