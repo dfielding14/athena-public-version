@@ -232,6 +232,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   r_circ_time = pin->GetOrAddReal("problem", "r_circ_time", 0.0);
 
   if(Globals::my_rank==0) {
+    std::cout << " rotation = " << rotation << "\n";
     std::cout << " Mhalo = " << Mhalo << "\n";
     std::cout << " Mgal = " << Mgal << "\n";
     std::cout << " cnfw = " << cnfw << "\n";
@@ -661,6 +662,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IDN,k,j,i) *= (1.+ dpert*(ran2(&iseed)-0.5)); 
         }
         if (rotation) {
+          if(Globals::my_rank==0) std::cout << " -vc_0 / (r*std::sin(theta)) = " << -vc_0 / (r*std::sin(theta)) << "\n";
+
           phydro->w(IVZ,k,j,i) = -vc_0 / (r*std::sin(theta));
         }
 // Configuration checking
