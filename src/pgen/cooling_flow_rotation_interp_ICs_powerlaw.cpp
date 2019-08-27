@@ -523,6 +523,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   if(mesh_bcs[OUTER_X1] == GetBoundaryFlag("user")) {
     if (Mdot_factor <= 1.){
       EnrollUserBoundaryFunction(OUTER_X1, ConstantOuterX1);
+      if (Globals::my_rank==0) std::cout << " turning on ConstantOuterX1 \n";
     } else {
       if (pin->GetOrAddBoolean("problem", "velocity_BC", false)){
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuter_velocity_X1);
@@ -531,8 +532,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
           std::cout << " EvolvingRotationOuterX1 On with r_circ_target = " << r_circ_target << " r_circ_time = " << r_circ_time << "\n";
         }
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingRotationOuterX1);
+        if (Globals::my_rank==0) std::cout << " turning on EvolvingRotationOuterX1 \n";
       } else {
         EnrollUserBoundaryFunction(OUTER_X1, EvolvingOuterX1);
+        if (Globals::my_rank==0) std::cout << " turning on EvolvingOuterX1 \n";
       }
     }
   }
@@ -545,6 +548,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
       EnrollUserBoundaryFunction(INNER_X1, ConstantWindX1);
     } else {
       EnrollUserBoundaryFunction(INNER_X1, ExtrapInnerX1);
+      if(Globals::my_rank==0) std::cout << " turning on ExtrapInnerX1 \n";
     }
   }
   return;
@@ -1283,9 +1287,9 @@ void ConstantOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
           Real r = pco->x1v(ie+i);
           Real theta = pco->x2v(j);
           if (r*std::sin(theta) > r_circ){
-            prim(IVZ,k,j,i) = -vc_0 * r_circ/(r*std::sin(theta));
+            prim(IVZ,k,j,ie+i) = -vc_0 * r_circ/(r*std::sin(theta));
           } else {
-            prim(IVZ,k,j,i) = -vc_0;
+            prim(IVZ,k,j,ie+i) = -vc_0;
           }
         }
 #if MAGNETIC_FIELDS_ENABLED
