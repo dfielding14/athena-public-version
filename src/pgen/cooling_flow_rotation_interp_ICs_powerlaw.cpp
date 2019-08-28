@@ -1061,7 +1061,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             delta_e_ceil += (u - u_max);
           }
         }
-        if ((rho > rho_max) && (temperature(k,j,i) < T_SF) && (pmb->pcoord->x1v(i) < 2.0*r_circ) && (m1/m3 < 0.5)){
+        if ((rho > rho_max) && (temperature(k,j,i) < T_SF) && (pmb->pcoord->x1v(i) < 2.0*r_circ) && (m1/m3 < 0.5) && ( m1/rho / sqrt(5/3. * pgas_half/rho) > -0.5)){
           Real delta_rho = rho-rho_max;
           delta_M_ceil += delta_rho * pmb->pcoord->GetCellVolume(k,j,i);
           e  -= kinetic;
