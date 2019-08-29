@@ -60,7 +60,7 @@ static Real Mhalo, cnfw, GMhalo, rvir, r200m, Mgal, GMgal, Rgal;
 static Real rho_wind, v_wind, cs_wind, eta,Mdot_wind, opening_angle;
 static Real rho_igm, v_igm, cs_igm, Mdot_igm;
 static Real cs, rho_ta, f_cs,f2;
-static Real T_SF, rho_max;
+static Real T_SF, R_SF, radial_over_azimuthal_SF, Mach_SF, rho_max;
 
 static Real r_inner, r_outer, r_ratio;
 
@@ -181,9 +181,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   opening_angle = pin->GetOrAddReal("problem", "opening_angle", PI/2.); // half opening angle, symmetric about equator
 
   // SF proxy
-  Real n_max       = pin->GetOrAddReal("problem", "n_max", 1.0e20);
-  rho_max = n_max*mp*0.62 / rho_scale;
-  T_SF          = pin->GetOrAddReal("problem", "T_SF", 3.e4);
+  Real n_max               = pin->GetOrAddReal("problem", "n_max", 1.0e20);
+  rho_max                  = n_max*mp*0.62 / rho_scale;
+  T_SF                     = pin->GetOrAddReal("problem", "T_SF", 3.e4);
+  R_SF                     = pin->GetOrAddReal("problem", "R_SF", 1.0e10)*kpc / length_scale;
+  radial_over_azimuthal_SF = pin->GetOrAddReal("problem", "radial_over_azimuthal_SF", 1.0e10);
+  Mach_SF                  = pin->GetOrAddReal("problem", "Mach_SF", 1.0e10);
 
   // Gravity
   vc_0         = pin->GetOrAddReal("problem", "vc_0", 90.67415e5)/vel_scale; // in Msun
@@ -232,6 +235,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   r_circ_time = pin->GetOrAddReal("problem", "r_circ_time", 0.0);
 
   if(Globals::my_rank==0) {
+    std::cout << " R_SF = " << R_SF << "\n";
     std::cout << " rotation = " << rotation << "\n";
     std::cout << " Mhalo = " << Mhalo << "\n";
     std::cout << " Mgal = " << Mgal << "\n";
@@ -1065,7 +1069,7 @@ void SourceFunction(MeshBlock *pmb, const Real t, const Real dt,
             delta_e_ceil += (u - u_max);
           }
         }
-        if ((rho > rho_max) && (temperature(k,j,i) < T_SF) && (pmb->pcoord->x1v(i) < 2.0*r_circ) && (m1/m3 < 0.5) && ( m1/rho / sqrt(5/3. * pgas_half/rho) > -0.5)){
+        if ((rho > rho_max) && (temperature(k,j,i) < T_SF) && (pmb->pcoord->x1v(i) < R_SF) && ( fabs(m1/m3) < radial_over_azimuthal_SF) && ( fabs(m1/rho) / sqrt(5/3. * pgas_half/rho) < Mach_SF )){
           Real delta_rho = rho-rho_max;
           delta_M_ceil += delta_rho * pmb->pcoord->GetCellVolume(k,j,i);
           e  -= kinetic;
