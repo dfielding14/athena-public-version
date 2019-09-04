@@ -126,7 +126,7 @@ static Real T_cond_max;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
-static Real smoothing_thickness, velocity_pert, lambda_pert, z_top, z_bot;
+static Real smoothing_thickness, smoothing_thickness_vel3, velocity_pert, lambda_pert, z_top, z_bot;
 
 static int nstages;
 static Real weights[4];
@@ -228,6 +228,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   // Initial conditions and Boundary values
   smoothing_thickness = pin->GetReal("problem", "smoothing_thickness");
+  smoothing_thickness_vel3 = pin->GetOrAddReal("problem", "smoothing_thickness_vel3", -100.0);
+  if (smoothing_thickness_vel3 < 0){
+    smoothing_thickness_vel3 = smoothing_thickness;
+  }
   velocity_pert       = pin->GetReal("problem", "velocity_pert");
   lambda_pert         = pin->GetReal("problem", "lambda_pert");
   z_top               = pin->GetReal("problem", "z_top");
@@ -499,7 +503,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IVY,k,j,i) = 0.0;
           if (lambda_pert > 0.0){
             phydro->w(IVZ,k,j,i) = velocity_pert;
-            phydro->w(IVZ,k,j,i) *= (std::exp(-SQR((z-z_bot)/smoothing_thickness)) + std::exp(-SQR((z-z_top)/smoothing_thickness)));
+            phydro->w(IVZ,k,j,i) *= (std::exp(-SQR((z-z_bot)/smoothing_thickness_vel3)) + std::exp(-SQR((z-z_top)/smoothing_thickness_vel3)));
             phydro->w(IVZ,k,j,i) *= std::sin(2*PI*x/lambda_pert) * std::sin(2*PI*y/lambda_pert) ;
             if (lambda_pert_2 > 0.0){
               phydro->w(IVZ,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase) * std::sin((2*PI*y/lambda_pert_2)+2*PI*lambda_pert_2_phase);
@@ -517,7 +521,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IDN,k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ) );
           phydro->w(IPR,k,j,i) = pgas_0*scale_temperature;
           phydro->w(IVX,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((y-z_bot)/smoothing_thickness) - std::tanh((y-z_top)/smoothing_thickness) ));
-          phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness)) + std::exp(-SQR((y-z_top)/smoothing_thickness))) * std::sin(2*PI*x/lambda_pert);
+          phydro->w(IVY,k,j,i) = velocity_pert * (std::exp(-SQR((y-z_bot)/smoothing_thickness_vel3)) + std::exp(-SQR((y-z_top)/smoothing_thickness_vel3))) * std::sin(2*PI*x/lambda_pert);
           if (lambda_pert_2 > 0.0){
             phydro->w(IVY,k,j,i) *= std::sin((2*PI*x/lambda_pert_2)+2*PI*lambda_pert_2_phase);
           }
@@ -529,7 +533,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           phydro->w(IDN,k,j,i) = rho_0 * (1.0 + (density_contrast-1.0) * 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ) );
           phydro->w(IPR,k,j,i) = pgas_0*scale_temperature;
           phydro->w(IVX,k,j,i) = 0.0; 
-          phydro->w(IVY,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness) - std::tanh((x-z_top)/smoothing_thickness) ));
+          phydro->w(IVY,k,j,i) = velocity * ( 0.5 - 0.5 * ( std::tanh((x-z_bot)/smoothing_thickness_vel3) - std::tanh((x-z_top)/smoothing_thickness_vel3) ));
           phydro->w(IVZ,k,j,i) = 0.0;
         }
       }
