@@ -123,6 +123,7 @@ static Real density_contrast,velocity;
 static Real Lambda_cool, s_Lambda, t_cool_start;
 static Real Tmin,Tmax,Tmix,Tlow,Thigh,M;
 static Real T_cond_max;
+static Real edot_density_exponent;
 
 static Real cooling_timestep(MeshBlock *pmb);
 static Real dt_cutoff, cfl_cool;
@@ -174,6 +175,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   cfl_cool = pin->GetOrAddReal("problem", "cfl_cool", 0.1);
   Lambda_cool = pin->GetReal("problem", "Lambda_cool");
   s_Lambda = pin->GetReal("problem", "s_Lambda");
+
+  edot_density_exponent = pin->GetOrAddReal("problem", "edot_density_exponent", 2.0);
 
   Tmin = pgas_0/rho_0 / density_contrast;
   Tmax = pgas_0/rho_0;
@@ -793,7 +796,7 @@ Real history_recorder(MeshBlock *pmb, int iout)
 static Real edot_cool(Real press, Real dens)
 {
   return -1.0 * Lambda_cool * 
-                SQR(dens) * 
+                pow(dens,edot_density_exponent) * 
                 std::sin(2*PI*std::log(press/dens) / (std::log(1/density_contrast))) ;
 }
 
