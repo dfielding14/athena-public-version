@@ -788,12 +788,13 @@ Real history_recorder(MeshBlock *pmb, int iout)
 
 //----------------------------------------------------------------------------------------
 // calculated edot_cool 
-// the cooling curve is set to be a log-normal distribution with a maximum equal to
-// Lambda_cool * ( 1 - epsilon ~ 0.1-2% ). 
-// The volumetric cooling rate is density**2 * Lambda(T)
+// the cooling curve is set to be a sine wave 
+// negative sine is make it cooling at low temp
 static Real edot_cool(Real press, Real dens)
 {
-  return Lambda_cool * SQR(dens) * std::sin(std::log(press/dens) / (2*PI*std::log(1/density_contrast))) ;
+  return -1.0 * Lambda_cool * 
+                SQR(dens) * 
+                std::sin(2*PI*std::log(press/dens) / (std::log(1/density_contrast))) ;
 }
 
 // Below is the original version which did not account for the fact that maximum of a log normal > 1.
