@@ -18,7 +18,7 @@
 
 // Declarations
 void Source(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> &prim,
-    const AthenaArray<Real> &bcc, AthenaArray<Real> &cons);
+    const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage);
 int RefinementCondition(MeshBlock *pmb);
 
 // Global variables
@@ -114,7 +114,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 //----------------------------------------------------------------------------------------
 
 void Source(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> &prim,
-    const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
+    const AthenaArray<Real> &bcc, AthenaArray<Real> &cons, int stage)
 {
   // Apply cooling function
   Real tau_hot = tau_hot_1;
