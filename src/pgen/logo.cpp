@@ -61,10 +61,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   int offset = *reinterpret_cast<int *>(&head[10]);
 
   // Read pixel data
-  int row_size = width/32 * 4;
-  if (width%32 != 0) {
-    row_size += 4;
-  }
+  int row_size = width;
+  // int row_size = width/32 * 4;
+  // if (width%32 != 0) {
+  //   row_size += 4;
+  // }
+
   int file_size = row_size * height;
   unsigned char *data = new unsigned char[file_size];
   fseek(bmp, offset, SEEK_SET);
@@ -73,13 +75,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // Prepare user data
   AllocateIntUserMeshDataField(1);
   iuser_mesh_data[0].NewAthenaArray(width, height);
+  // for (int j = 0; j < height; ++j) {
+  //   for (int i = 0; i < width/8; ++i) {
+  //     int fpos = j*row_size + i;
+  //     for (int k = 0; k < 8; ++k) {
+  //       int rev_i = i*8 + 7 - k;
+  //       iuser_mesh_data[0](j,rev_i) = (data[fpos] >> k) & 1;
+  //     }
+  //   }
+  // }
   for (int j = 0; j < height; ++j) {
-    for (int i = 0; i < width/8; ++i) {
+    for (int i = 0; i < width; ++i) {
       int fpos = j*row_size + i;
-      for (int k = 0; k < 8; ++k) {
-        int rev_i = i*8 + 7 - k;
-        iuser_mesh_data[0](j,rev_i) = (data[fpos] >> k) & 1;
-      }
+      iuser_mesh_data[0](j,i) = data[fpos];
     }
   }
 
