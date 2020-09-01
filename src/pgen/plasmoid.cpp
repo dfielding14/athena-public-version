@@ -45,10 +45,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     SetGravityThreshold(eps);
   }
 
-  if (MAGNETIC_FIELDS_ENABLED) {
-    beta = pin->GetReal("problem","beta");
-  }
-
 // turb_flag is initialzed in the Mesh constructor to 0 by default;
 // turb_flag = 1 for decaying turbulence
 // turb_flag = 2 for impulsively driven turbulence
@@ -73,7 +69,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Real gmma  = peos->GetGamma();
-  gmma1 = gmma - 1.0;
+  Real gmma1 = gmma - 1.0;
 
   for (int k=ks; k<=ke; k++) {
   for (int j=js; j<=je; j++) {
@@ -90,7 +86,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   }}}
 
   // initialize interface B, assuming longitudinal field only B=(1,0,0)
+  Real beta;
   if (MAGNETIC_FIELDS_ENABLED) {
+    beta = pin->GetReal("problem","beta");
     Real bx = std::sqrt(2.0/beta);
 
     for (int k=ks; k<=ke; k++) {
